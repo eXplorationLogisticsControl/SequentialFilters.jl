@@ -1,2 +1,1 @@
-# SequentialFilters.jl
-Sequential filters in Julia
+# `SequentialFilters.jl`: Sequential filters in Julia
