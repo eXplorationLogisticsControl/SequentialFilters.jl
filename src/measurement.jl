@@ -1,5 +1,8 @@
-"""Measurement model struct"""
+"""
+Measurement model.
 
+[`NonlinearMeasurementModel`](@ref) returns the predicted measurement and its Jacobian.
+"""
 abstract type MeasurementModel end
 
 """

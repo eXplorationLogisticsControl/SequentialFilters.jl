@@ -98,6 +98,9 @@ function load_twobody_case()
         dt64 = Float64(Δt_step)
         hit = cache[]
         if hit.valid && hit.t == t64 && hit.Δt == dt64 && hit.x == x64
+            # One predict calls both `f` and `F`. Consume the slot so a later
+            # run with the same state integrates again.
+            cache[] = (; valid = false)
             return copy(hit.xnext), copy(hit.Φ)
         end
         xwork = copy(x64)
@@ -113,6 +116,7 @@ function load_twobody_case()
     F(t, x, dt) = step_dynamics(t, x, dt)[2]
     h(t, x) = range_rangerate(t, x)
     H(t, x) = ForwardDiff.jacobian(z -> range_rangerate(t, z), x)
+    measurements = NonlinearMeasurementModel((t, x) -> (h(t, x), H(t, x)))
 
     labels = [
         "δx (km)",
@@ -125,5 +129,6 @@ function load_twobody_case()
 
     return (;
         x0, x_hat0, P0, R, Q, Δt, n_meas, truth, ys, f, F, h, H, labels,
+        dynamics, process_noise, measurements,
     )
 end

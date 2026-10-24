@@ -1,5 +1,10 @@
-"""Extended Kalman filter struct"""
+"""
+    ExtendedKalmanFilter(t, x, P)
 
+Continuous-discrete extended Kalman filter. `x` is the mean and `P` the covariance.
+`predict!` integrates the dynamics and state-transition matrix. `update!` applies
+the Joseph form.
+"""
 mutable struct ExtendedKalmanFilter
     t::Float64
     x::Vector
