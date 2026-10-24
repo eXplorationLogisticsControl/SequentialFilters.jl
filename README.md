@@ -28,4 +28,5 @@ julia --project=demo demo/demo_twobody_ekf.jl
 julia --project=demo demo/demo_ukf.jl
 julia --project=demo demo/demo_srekf.jl
 julia --project=demo demo/demo_srukf.jl
+julia --project=demo demo/demo_srcut.jl
 ```

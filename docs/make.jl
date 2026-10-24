@@ -25,6 +25,7 @@ makedocs(;
             "Unscented Kalman filter" => "tutorials/ukf.md",
             "Square-root EKF" => "tutorials/srekf.md",
             "Square-root UKF" => "tutorials/srukf.md",
+            "Square-root CUT" => "tutorials/srcut.md",
         ],
         "API" => "api.md",
     ],

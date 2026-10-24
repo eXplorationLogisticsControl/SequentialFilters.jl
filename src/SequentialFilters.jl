@@ -11,6 +11,7 @@ include("ukf.jl")
 include("srekf.jl")
 include("srukf.jl")
 include("cut.jl")
+include("srcut.jl")
 
 export ProcessNoiseModel, UnbiasedRandomProcess, get_noise
 export DynamicsModel, NonlinearODEModel, propagate!
@@ -19,5 +20,6 @@ export ExtendedKalmanFilter, predict!, update!
 export UnscentedKalmanFilter, get_sigma_points, unscented_weights
 export SquareRootExtendedKalmanFilter, SquareRootUnscentedKalmanFilter, covariance
 export ConjugateUnscentedKalmanFilter, cut_points
+export SquareRootConjugateUnscentedKalmanFilter
 
 end # module SequentialFilters

@@ -187,6 +187,48 @@ function run_discrete_ukf()
     return filt
 end
 
+function run_cut(case)
+    filt = ConjugateUnscentedKalmanFilter(0.0, case.x_hat0, case.P0; order = 4)
+    for k in 1:case.n_meas
+        predict!(filt, case.f, case.Q, case.Δt)
+        update!(filt, case.h, case.ys[k], case.R)
+    end
+    return filt
+end
+
+function run_srcut(case)
+    filt = SquareRootConjugateUnscentedKalmanFilter(0.0, case.x_hat0, case.P0; order = 4)
+    for k in 1:case.n_meas
+        predict!(filt, case.f, case.Q, case.Δt)
+        update!(filt, case.h, case.ys[k], case.R)
+    end
+    return filt
+end
+
+function run_discrete_cut()
+    model = _linear_model()
+    filt = ConjugateUnscentedKalmanFilter(0.0, model.x0, model.P0; order = 4)
+    f = (t, x, dt) -> model.F * x
+    h = (t, x) -> model.H * x
+    for _ in 1:model.nsteps
+        predict!(filt, f, model.Q, 1.0)
+        update!(filt, h, model.y, model.R)
+    end
+    return filt
+end
+
+function run_discrete_srcut()
+    model = _linear_model()
+    filt = SquareRootConjugateUnscentedKalmanFilter(0.0, model.x0, model.P0; order = 4)
+    f = (t, x, dt) -> model.F * x
+    h = (t, x) -> model.H * x
+    for _ in 1:model.nsteps
+        predict!(filt, f, model.Q, 1.0)
+        update!(filt, h, model.y, model.R)
+    end
+    return filt
+end
+
 function run_discrete_srukf()
     model = _linear_model()
     filt = SquareRootUnscentedKalmanFilter(0.0, model.x0, model.P0)
@@ -202,8 +244,8 @@ end
 """
     print_filter_costs(case, pair)
 
-`pair` is `:ekf` or `:ukf`. Prints two-body and linear-kernel costs for the
-covariance-form filter and its square-root form.
+`pair` is `:ekf`, `:ukf`, or `:cut`. Prints two-body and linear-kernel costs for the
+covariance-form filter and its square-root form. The CUT pair uses order 4.
 """
 function print_filter_costs(case, pair::Symbol)
     println()
@@ -236,8 +278,21 @@ function print_filter_costs(case, pair::Symbol)
         _print_cost("UKF", covariance_cost)
         _print_cost("square-root UKF", square_root_cost)
         _print_ratio(covariance_cost, square_root_cost)
+    elseif pair == :cut
+        println("two-body recursion (same CUT4 sigma points, one warmed run)")
+        covariance_cost = measure_cost(() -> run_cut(case); samples = 1)
+        square_root_cost = measure_cost(() -> run_srcut(case); samples = 1)
+        _print_cost("CUT", covariance_cost)
+        _print_cost("square-root CUT", square_root_cost)
+        _print_ratio(covariance_cost, square_root_cost)
+        println("linear kernel (CUT4, 6 states, 2 measurements, 5000 steps, fastest of 5 runs)")
+        covariance_cost = measure_cost(run_discrete_cut; samples = 5)
+        square_root_cost = measure_cost(run_discrete_srcut; samples = 5)
+        _print_cost("CUT", covariance_cost)
+        _print_cost("square-root CUT", square_root_cost)
+        _print_ratio(covariance_cost, square_root_cost)
     else
-        throw(ArgumentError("pair must be :ekf or :ukf, got $pair"))
+        throw(ArgumentError("pair must be :ekf, :ukf, or :cut, got $pair"))
     end
     println("On the two-body run both filters share the ODE propagation.")
     println("The linear kernel is the predict/update cost without that propagation.")
