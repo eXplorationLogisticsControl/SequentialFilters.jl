@@ -1,7 +1,5 @@
-# Two-body range and range-rate EKF, same scenario as test/test_ekf.jl.
-#
-#   julia --startup-file=no --project=demo -e 'using Pkg; Pkg.instantiate()'
-#   julia --startup-file=no --project=demo demo/twobody_ekf.jl
+"""Demo with two-body dynamics using EKF"""
+
 
 import Pkg
 Pkg.activate(@__DIR__)
