@@ -18,13 +18,13 @@ The square-root filters keep a lower-triangular factor with a positive diagonal.
 
 Each tutorial starts with why that filter exists and the papers to read, then the predict and update equations, then the same calls the two-body demos make. A quantity \(X\) after prediction is the prior \(X_{k:k-1}\); after the measurement update it is the posterior \(X_{k:k}\).
 
-- [Extended Kalman filter](@ref ekf-tutorial)
-- [Unscented Kalman filter](@ref ukf-tutorial)
-- [Conjugate unscented filter](@ref cut-tutorial)
-- [Square-root EKF](@ref srekf-tutorial)
-- [Square-root UKF](@ref srukf-tutorial)
-- [Square-root CUT](@ref srcut-tutorial)
-- [Square-root cubature Kalman filter](@ref srckf-tutorial)
+- [Extended Kalman filter (EKF)](@ref ekf-tutorial)
+- [Unscented Kalman filter (UKF)](@ref ukf-tutorial)
+- [Conjugate unscented filter (CUT)](@ref cut-tutorial)
+- [Square-root EKF (SREKF)](@ref srekf-tutorial)
+- [Square-root UKF (SRUKF)](@ref srukf-tutorial)
+- [Square-root CUT (SRCUT)](@ref srcut-tutorial)
+- [Square-root CKF (SRCKF)](@ref srckf-tutorial)
 
 ## Demos and cost
 

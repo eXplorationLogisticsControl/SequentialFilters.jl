@@ -1,4 +1,4 @@
-# [Square-root EKF](@id srekf-tutorial)
+# [Square-root EKF (SREKF)](@id srekf-tutorial)
 
 `SquareRootExtendedKalmanFilter` is a discrete extended Kalman filter. It stores the covariance as a lower-triangular factor `S` with a positive diagonal and
 

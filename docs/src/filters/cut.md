@@ -1,4 +1,4 @@
-# [Conjugate unscented filter](@id cut-tutorial)
+# [Conjugate unscented filter (CUT)](@id cut-tutorial)
 
 `ConjugateUnscentedKalmanFilter` is the conjugate unscented Kalman filter of Adurthi, Singla, and Singh, with additive process and measurement noise. It stores the mean `x` and the covariance `P`. No Jacobians are required.
 
@@ -14,6 +14,7 @@ Use CUT when the UKF's ``2n+1`` points are not enough and a particle filter is m
 
 - Adurthi, N., Singla, P., and Singh, T. (2013). [The Conjugate Unscented Transform — An Approach to Evaluate Finite-Dimensional Integrals](https://ieeexplore.ieee.org/document/6314970). *Proc. American Control Conference*, 5584–5589.
 - Adurthi, N., Singla, P., and Singh, T. (2018). [Conjugate Unscented Transformation: Applications to Estimation and Control](https://doi.org/10.1115/1.4037783). *ASME Journal of Dynamic Systems, Measurement, and Control*, 140(3), 030907. The radii and weights implemented here are the CUT4-G and CUT6-G tables in that paper.
+- Zanetti, R., and DeMars, K. J. (2013). [Joseph Formulation of Unscented and Quadrature Filters with Application to Consider States](https://doi.org/10.2514/1.59935). *Journal of Guidance, Control, and Dynamics*, 36(6), 1860–1863.
 
 ## Prediction
 
@@ -63,10 +64,14 @@ x_{k:k} = x_{k:k-1} + K\bigl(y_{k} - \hat y_{k:k-1}\bigr),
 ```
 
 ```math
-P_{k:k} = P_{k:k-1} - K S_{y,k:k-1} K^\top.
+P_{k:k}
+  = P_{k:k-1}
+  - P_{xy,k:k-1} K^\top
+  - K P_{xy,k:k-1}^\top
+  + K S_{y,k:k-1} K^\top.
 ```
 
-``S_{y,k:k-1}`` and ``P_{k:k}`` are symmetrized. Process and measurement noise are added after the cubature.
+``S_{y,k:k-1}`` and ``P_{k:k}`` are symmetrized. Process and measurement noise are added after the cubature. The posterior is the Joseph formula of Zanetti and DeMars rather than ``P_{k:k-1} - K S_{y,k:k-1} K^\top``. As on the [UKF](@ref ukf-tutorial) page, that form stays symmetric and is less sensitive to roundoff in ``K``. It remains valid when the gain is not the optimal ``P_{xy} S_y^{-1}``. For the optimal gain the two formulas agree in exact arithmetic. No measurement Jacobian is required: ``P_{xy}`` takes the place of ``P H^\top``. The cubature only supplies the moments.
 
 ## Two-body demo
 

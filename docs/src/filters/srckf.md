@@ -1,4 +1,4 @@
-# [Square-root cubature Kalman filter](@id srckf-tutorial)
+# [Square-root CKF (SRCKF)](@id srckf-tutorial)
 
 `SquareRootCubatureKalmanFilter` is the Arasaratnam and Haykin square-root cubature Kalman filter with additive noise. The covariance is a lower-triangular factor `S` with a positive diagonal and
 
