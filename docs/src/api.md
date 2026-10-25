@@ -27,6 +27,14 @@ unscented_weights
 get_sigma_points
 ```
 
+## Conjugate unscented filters
+
+```@docs
+ConjugateUnscentedKalmanFilter
+cut_points
+SquareRootConjugateUnscentedKalmanFilter
+```
+
 ## Square-root filters
 
 ```@docs
