@@ -42,6 +42,16 @@ julia --project=demo demo/demo_srukf.jl
 julia --project=demo demo/demo_srcut.jl
 julia --project=demo demo/demo_srckf.jl
 julia --project=demo demo/demo_particle.jl
+julia --project=demo demo/demo_lorenz_ekf.jl
+julia --project=demo demo/demo_lorenz_ukf.jl
+julia --project=demo demo/demo_lorenz_cut.jl
+julia --project=demo demo/demo_lorenz_srekf.jl
+julia --project=demo demo/demo_lorenz_srukf.jl
+julia --project=demo demo/demo_lorenz_srcut.jl
+julia --project=demo demo/demo_lorenz_srckf.jl
+julia --project=demo demo/demo_lorenz_particle.jl
 ```
+
+`demo/lorenz63.jl` is the Lorenz-63 system (σ = 10, ρ = 28, β = 8/3), not a Lorentz force. Each Lorenz script uses that shared `NonlinearODEModel`, a step of 0.02, 2000 steps, additive process noise `Q = 10⁻³ I`, and measurements of `x` and `z`. The initial state `[1, 1, 1]` is off the attractor.
 
 On the two-body timing, both members of a pair propagate the same dynamics, so that comparison includes the ODE. A second linear kernel (6 states, 2 measurements, 5000 steps, no ODE) isolates the predict and update cost. The printed `square-root / covariance` ratios are that cost. Process CPU time sums every thread, so it can exceed elapsed time when a covariance product uses more than one BLAS thread. The square-root return on these dense, low-dimensional steps is the factor: stored `S` stays positive definite. The ratios show what the QR and downdate cost relative to forming `P` directly.
