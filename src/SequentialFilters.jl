@@ -11,7 +11,6 @@ include("ukf.jl")
 include("cut.jl")
 include("srekf.jl")
 include("srukf.jl")
-include("cut.jl")
 include("srcut.jl")
 include("diagnosis.jl")
 
@@ -22,7 +21,6 @@ export ExtendedKalmanFilter, predict!, update!
 export UnscentedKalmanFilter, get_sigma_points, unscented_weights
 export ConjugateUnscentedKalmanFilter, cut_points
 export SquareRootExtendedKalmanFilter, SquareRootUnscentedKalmanFilter, covariance
-export ConjugateUnscentedKalmanFilter, cut_points
 export SquareRootConjugateUnscentedKalmanFilter
 export estimation_error, rmse, block_rmse, time_averaged_rmse
 export nees, averaged_nees, nis, averaged_nis
