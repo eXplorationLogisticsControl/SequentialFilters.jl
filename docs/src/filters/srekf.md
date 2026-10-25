@@ -12,7 +12,7 @@ The constructor factors `P` once. Later predict and update steps rebuild `S` wit
 
 ## Motivation
 
-The [EKF](@ref ekf-tutorial) stores ``P`` and applies rank-two updates (``P_{k:k-1} = F P_{k-1:k-1} F^\top + Q``, Joseph). In finite precision those products can lose symmetry and, after enough steps or when ``R`` is small, positive-definiteness. A square-root filter stores a factor ``S`` with ``P = SS^\top``, so the reconstructed covariance cannot become indefinite. Predict and update rebuild ``S`` with a thin QR; they do not form ``P`` and call `cholesky` again.
+The [EKF](@ref ekf-tutorial) stores ``P`` and applies rank-two updates (``P_{k|k-1} = F P_{k-1|k-1} F^\top + Q``, Joseph). In finite precision those products can lose symmetry and, after enough steps or when ``R`` is small, positive-definiteness. A square-root filter stores a factor ``S`` with ``P = SS^\top``, so the reconstructed covariance cannot become indefinite. Predict and update rebuild ``S`` with a thin QR; they do not form ``P`` and call `cholesky` again.
 
 Use this form when the estimate must stay numerically well-conditioned, or when you want the EKF's mean and Jacobians without refactoring ``P`` at every step. The mean recursion is the discrete EKF. Only the covariance arithmetic changes. `covariance(filter)` rebuilds ``P = SS^\top`` when a full matrix is needed, for example the ``\pm 3\sqrt{P_{ii}}`` bands in the demo. On a dense, low-dimensional problem the QR is extra work relative to forming ``P``; the return is the stored factor.
 
@@ -26,69 +26,69 @@ Use this form when the estimate must stay numerically well-conditioned, or when 
 ## Prediction
 
 ```math
-x_{k:k-1} = f\bigl(t_{k-1}, x_{k-1:k-1}, \Delta t\bigr), \qquad
-F = \frac{\partial f}{\partial x}\bigl(t_{k-1}, x_{k-1:k-1}, \Delta t\bigr).
+x_{k|k-1} = f\bigl(t_{k-1}, x_{k-1|k-1}, \Delta t\bigr), \qquad
+F = \frac{\partial f}{\partial x}\bigl(t_{k-1}, x_{k-1|k-1}, \Delta t\bigr).
 ```
 
-Let ``S_q`` be a factor of the process noise, ``Q = S_q S_q^\top`` (lower Cholesky when `Q` is positive definite, and an eigenvalue factor when it is only semidefinite). The predicted factor is the thin QR of the stacked transpose
+Let ``S_q`` be a factor of the process noise, ``Q = S_q S_q^\top`` (lower Cholesky when `Q` is positive definite, and an eigenvalue factor when it is only semidefinite). The prior factor ``S_{k|k-1}`` is the thin QR of the stacked transpose
 
 ```math
-\begin{bmatrix} (F S_{k-1:k-1})^\top \\ S_q^\top \end{bmatrix}
+\begin{bmatrix} (F S_{k-1|k-1})^\top \\ S_q^\top \end{bmatrix}
 = Q_r R.
 ```
 
 Rows of ``R`` whose diagonal entry is negative are multiplied by ``-1``, and the stored factor is the lower triangle of ``R^\top``. That gives
 
 ```math
-S_{k:k-1} S_{k:k-1}^\top
-  = F S_{k-1:k-1} S_{k-1:k-1}^\top F^\top + Q
+S_{k|k-1} S_{k|k-1}^\top
+  = F S_{k-1|k-1} S_{k-1|k-1}^\top F^\top + Q
 ```
 
-with a nonnegative diagonal. The mean is ``x_{k:k-1}`` and time advances by ``\Delta t``.
+with a nonnegative diagonal. The mean is ``x_{k|k-1}`` and time advances by ``\Delta t``.
 
 `predict!` takes a [`DynamicsModel`](@ref) and a [`ProcessNoiseModel`](@ref), with ``Q = `` `get_noise(process_noise_model, Δt)`. A [`NonlinearODEModel`](@ref) integrates the augmented state and returns that `ODESolution`; ``F`` is read from it. A [`DiscreteDynamicsModel`](@ref) evaluates `f(t, x, Δt)` and `discrete_jacobian` (the stored Jacobian, or ForwardDiff). The returned solution stores `[x; vec(Φ)]` on either path. There is no `ensemblealg` argument.
 
 ## Update
 
 ```math
-\hat y_{k:k-1} = h\bigl(t_k, x_{k:k-1}\bigr), \qquad
-H = \frac{\partial h}{\partial x}\bigl(t_k, x_{k:k-1}\bigr),
+\hat y_{k|k-1} = h\bigl(t_k, x_{k|k-1}\bigr), \qquad
+H = \frac{\partial h}{\partial x}\bigl(t_k, x_{k|k-1}\bigr),
 ```
 
-and ``R = S_r S_r^\top``. The innovation factor is the same QR map applied to ``[(H S_{k:k-1})^\top;\; S_r^\top]``:
+and ``R = S_r S_r^\top``. The innovation factor is the same QR map applied to ``[(H S_{k|k-1})^\top;\; S_r^\top]``:
 
 ```math
-S_{y,k:k-1} S_{y,k:k-1}^\top
-  = H S_{k:k-1} S_{k:k-1}^\top H^\top + R.
+S_{y,k|k-1} S_{y,k|k-1}^\top
+  = H S_{k|k-1} S_{k|k-1}^\top H^\top + R.
 ```
 
 The gain uses that factor rather than a fresh covariance inverse,
 
 ```math
-K = S_{k:k-1} (H S_{k:k-1})^\top
-    \bigl(S_{y,k:k-1} S_{y,k:k-1}^\top\bigr)^{-1}.
+K = S_{k|k-1} (H S_{k|k-1})^\top
+    \bigl(S_{y,k|k-1} S_{y,k|k-1}^\top\bigr)^{-1}.
 ```
 
-The posterior factor is the Joseph form, again as a thin QR,
+The posterior factor ``S_{k|k}`` is the Joseph form, again as a thin QR,
 
 ```math
-\begin{bmatrix} ((I - KH) S_{k:k-1})^\top \\ (K S_r)^\top \end{bmatrix},
+\begin{bmatrix} ((I - KH) S_{k|k-1})^\top \\ (K S_r)^\top \end{bmatrix},
 ```
 
 so
 
 ```math
-S_{k:k} S_{k:k}^\top
-  = (I - KH)\, S_{k:k-1} S_{k:k-1}^\top\, (I - KH)^\top + K R K^\top,
+S_{k|k} S_{k|k}^\top
+  = (I - KH)\, S_{k|k-1} S_{k|k-1}^\top\, (I - KH)^\top + K R K^\top,
 ```
 
 and
 
 ```math
-x_{k:k} = x_{k:k-1} + K\bigl(y_{k} - \hat y_{k:k-1}\bigr).
+x_{k|k} = x_{k|k-1} + K\bigl(y_{k} - \hat y_{k|k-1}\bigr).
 ```
 
-`update!(filter, model::MeasurementModel, y, R)` reads ``(\hat y_{k:k-1}, H)`` from `get_h_H`, which is the same measurement object the EKF update accepts.
+`update!(filter, model::MeasurementModel, y, R)` reads ``(\hat y_{k|k-1}, H)`` from `get_h_H`, which is the same measurement object the EKF update accepts.
 
 ## Two-body demo
 

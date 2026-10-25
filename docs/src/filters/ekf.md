@@ -8,7 +8,7 @@ The two-body demo is `demo/twobody/demo_ekf.jl`.
 
 Kalman's filter is the minimum-mean-square estimator for a linear-Gaussian model. Orbit determination, and most sensor models, are nonlinear, so the extended Kalman filter linearizes the dynamics and the measurement about the current estimate and reuses that same predict/update algebra. The cost is one ODE integration plus the variational equations for the state-transition matrix, then a Joseph covariance update. Use it when Jacobians are available and the estimate stays close enough that a first-order Taylor remainder is small. It is the usual first filter on a new problem.
 
-The linearization can underestimate covariance or diverge when the error is large, the map is strongly nonlinear, or a predict interval is long. The Joseph form ``P_{k:k} = (I-KH)P_{k:k-1}(I-KH)^\top + KRK^\top`` is used here instead of ``P_{k:k-1} - K S_{y,k:k-1} K^\top`` because it stays symmetric and is less sensitive to roundoff in ``K``. For the two-body demo the dynamics Jacobian is the state-transition matrix from those variational equations, and the range / range-rate Jacobian is taken with ForwardDiff.
+The linearization can underestimate covariance or diverge when the error is large, the map is strongly nonlinear, or a predict interval is long. The Joseph form ``P_{k|k} = (I-KH)P_{k|k-1}(I-KH)^\top + KRK^\top`` is used here instead of ``P_{k|k-1} - K S_{y,k|k-1} K^\top`` because it stays symmetric and is less sensitive to roundoff in ``K``. For the two-body demo the dynamics Jacobian is the state-transition matrix from those variational equations, and the range / range-rate Jacobian is taken with ForwardDiff.
 
 **Further reading.**
 
@@ -21,17 +21,17 @@ The linearization can underestimate covariance or diverge when the error is larg
 
 ## Prediction
 
-The continuous model is ``\dot x = f_c(t, x)``. Over ``[t_{k-1}, t_k]``, `propagate!` integrates the augmented state ``[x; \mathrm{vec}(\Phi)]`` from the posterior ``x_{k-1:k-1}`` and ``\Phi(t_{k-1}) = I``:
+The continuous model is ``\dot x = f_c(t, x)``. Over ``[t_{k-1}, t_k]``, `propagate!` integrates the augmented state ``[x; \mathrm{vec}(\Phi)]`` from the posterior ``x_{k-1|k-1}`` and ``\Phi(t_{k-1}) = I``:
 
 ```math
 \dot\Phi = F_c(t, x)\, \Phi, \qquad
 F_c = \frac{\partial f_c}{\partial x}.
 ```
 
-The predicted mean ``x_{k:k-1}`` is the integrated state. The predicted covariance is
+The prior mean ``x_{k|k-1}`` is the integrated state. The prior covariance is
 
 ```math
-P_{k:k-1} = \Phi P_{k-1:k-1} \Phi^\top + Q(\Delta t),
+P_{k|k-1} = \Phi P_{k-1|k-1} \Phi^\top + Q(\Delta t),
 ```
 
 then symmetrized. For [`UnbiasedRandomProcess`](@ref) on a 6-state position/velocity model,
@@ -44,32 +44,32 @@ Q(\Delta t) = \sigma_p^2
 \end{bmatrix}.
 ```
 
-Process noise is added once, at the end of the step. Along a saved trajectory, ``P(t) = \Phi(t) P_{k-1:k-1} \Phi(t)^\top`` does not yet include ``Q``.
+Process noise is added once, at the end of the step. Along a saved trajectory, ``P(t) = \Phi(t) P_{k-1|k-1} \Phi(t)^\top`` does not yet include ``Q``.
 
 ## Update
 
-[`NonlinearMeasurementModel`](@ref) supplies the predicted measurement ``\hat y_{k:k-1}`` and ``H`` through `get_h_H(t, x)` evaluated at the prior:
+[`NonlinearMeasurementModel`](@ref) supplies the predicted measurement ``\hat y_{k|k-1}`` and ``H`` through `get_h_H(t, x)` evaluated at the prior ``x_{k|k-1}``:
 
 ```math
-\hat y_{k:k-1} = h(t_k, x_{k:k-1}), \qquad
-H = \frac{\partial h}{\partial x}(t_k, x_{k:k-1}).
+\hat y_{k|k-1} = h(t_k, x_{k|k-1}), \qquad
+H = \frac{\partial h}{\partial x}(t_k, x_{k|k-1}).
 ```
 
 ```math
-S_{y,k:k-1} = H P_{k:k-1} H^\top + R, \qquad
-K = P_{k:k-1} H^\top S_{y,k:k-1}^{-1},
+S_{y,k|k-1} = H P_{k|k-1} H^\top + R, \qquad
+K = P_{k|k-1} H^\top S_{y,k|k-1}^{-1},
 ```
 
 ```math
-x_{k:k} = x_{k:k-1} + K\bigl(y_{k} - \hat y_{k:k-1}\bigr),
+x_{k|k} = x_{k|k-1} + K\bigl(y_{k} - \hat y_{k|k-1}\bigr),
 ```
 
 ```math
-P_{k:k}
-  = (I - KH)\, P_{k:k-1}\, (I - KH)^\top + K R K^\top.
+P_{k|k}
+  = (I - KH)\, P_{k|k-1}\, (I - KH)^\top + K R K^\top.
 ```
 
-``P_{k:k}`` is symmetrized after the update.
+``P_{k|k}`` is symmetrized after the update.
 
 ## Two-body demo
 
@@ -91,7 +91,7 @@ end
 
 `get_h_H(t, x)` returns `(range_rangerate(t, x), H)` with `H` from `ForwardDiff`. The full script also samples the predicted trajectory between measurements and writes `demo/twobody/plots/twobody_ekf_errors.png`.
 
-After the figure, the demo prints elapsed time, process CPU time, and allocations for this filter and the square-root EKF. The two-body pair both integrate `twobody!`. The linear kernel is 5000 steps of a 6-state model with constant `F` and `H` and no ODE: the covariance column is the same Joseph update as above, with ``x_{k:k-1} = F x_{k-1:k-1}`` and ``P_{k:k-1} = F P_{k-1:k-1} F^\top + Q``, and the other column is [`SquareRootExtendedKalmanFilter`](@ref).
+After the figure, the demo prints elapsed time, process CPU time, and allocations for this filter and the square-root EKF. The two-body pair both integrate `twobody!`. The linear kernel is 5000 steps of a 6-state model with constant `F` and `H` and no ODE: the covariance column is the same Joseph update as above, with ``x_{k|k-1} = F x_{k-1|k-1}`` and ``P_{k|k-1} = F P_{k-1|k-1} F^\top + Q``, and the other column is [`SquareRootExtendedKalmanFilter`](@ref).
 
 ```julia
 include(joinpath(@__DIR__, "..", "benchmark_filters.jl"))

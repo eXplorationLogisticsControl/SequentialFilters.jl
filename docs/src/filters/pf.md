@@ -6,7 +6,7 @@ The constructor draws `n_particles` samples from `N(x, P)`. The default is 100. 
 
 ## Motivation
 
-A Gaussian filter, including the [EKF](@ref ekf-tutorial) and the [UKF](@ref ukf-tutorial), replaces the filtering distribution by a mean and a covariance. That is a poor description when the posterior is skewed or has more than one mode. A particle filter keeps a weighted set of states. The bootstrap filter pushes those states through the dynamics and reweights them by the measurement likelihood.
+A Gaussian filter, including the [EKF](@ref ekf-tutorial) and the [UKF](@ref ukf-tutorial), replaces the filtering distribution by a mean and a covariance. That is a poor description when the posterior ``p(x_{k|k})`` is skewed or has more than one mode. A particle filter keeps a weighted set of states. The bootstrap filter pushes those states through the dynamics and reweights them by the measurement likelihood.
 
 The price is the number of trajectories. The default propagation is serial. Pass an ensemble algorithm when the dynamics are expensive enough that the points should run together.
 
@@ -20,21 +20,21 @@ The price is the number of trajectories. The default propagation is serial. Pass
 Each particle is an independent draw. With additive process noise,
 
 ```math
-x_{k:k-1}^{(i)} = f\bigl(t_{k-1}, x_{k-1:k-1}^{(i)}, \Delta t\bigr) + w_k^{(i)},
+x_{k|k-1}^{(i)} = f\bigl(t_{k-1}, x_{k-1|k-1}^{(i)}, \Delta t\bigr) + w_k^{(i)},
 \qquad w_k^{(i)} \sim \mathcal N(0, Q).
 ```
 
 Weights are unchanged. The reported mean and covariance are the weighted sample moments of the new set, and time advances by ``\Delta t``.
 
-`predict!` takes a [`DynamicsModel`](@ref) and a [`ProcessNoiseModel`](@ref). ``Q`` is `get_noise(process_noise_model, Δt)`. The noise-free map is [`EnsemblePropagation`](@ref). The default `ensemblealg` is [`EnsembleSerial`](@ref). Pass [`EnsembleThreads`](@ref), [`EnsembleDistributed`](@ref), or [`EnsembleSplitThreads`](@ref) to change the parallelism. Process-noise samples are drawn after that propagation, on `filter.rng`, so the random stream is not shared across threads. The returned `ODESolution` stores `[μ; vec(Φ)]` along the noise-free cloud, with ``\Phi P_{\mathrm{start}} \Phi^\top`` equal to that cloud's covariance. `filter.x` and `filter.P` include the process-noise samples.
+`predict!` takes a [`DynamicsModel`](@ref) and a [`ProcessNoiseModel`](@ref). ``Q`` is `get_noise(process_noise_model, Δt)`. The noise-free map is [`EnsemblePropagation`](@ref). The default `ensemblealg` is [`EnsembleSerial`](@ref). Pass [`EnsembleThreads`](@ref), [`EnsembleDistributed`](@ref), or [`EnsembleSplitThreads`](@ref) to change the parallelism. Process-noise samples are drawn after that propagation, on `filter.rng`, so the random stream is not shared across threads. The returned `ODESolution` stores `[μ; vec(Φ)]` along the noise-free cloud, with ``\Phi P_{k-1|k-1} \Phi^\top`` equal to that cloud's covariance. `filter.x` and `filter.P` include the process-noise samples.
 
 ## Update
 
-The measurement density is Gaussian. For a [`MeasurementModel`](@ref), `get_h_H` supplies the predicted measurement and the Jacobian is ignored. A noise-free `h(t, x)` is also accepted.
+The measurement density is Gaussian. For a [`MeasurementModel`](@ref), `get_h_H` supplies ``\hat y_{k|k-1}`` and the Jacobian is ignored. A noise-free `h(t, x)` is also accepted.
 
 ```math
-w_k^{(i)} \propto w_{k:k-1}^{(i)}\,
-\mathcal N\bigl(y_k;\, h(t_k, x_{k:k-1}^{(i)}),\, R\bigr).
+w_{k|k}^{(i)} \propto w_{k|k-1}^{(i)}\,
+\mathcal N\bigl(y_k;\, h(t_k, x_{k|k-1}^{(i)}),\, R\bigr).
 ```
 
 Weights are normalized so they sum to 1. [`resample!`](@ref) then replaces the particles. `:systematic` uses one uniform draw and equally spaced ranks. `:multinomial` draws each ancestor independently. The new weights are `1/N`.

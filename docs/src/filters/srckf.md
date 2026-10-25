@@ -12,40 +12,42 @@ The point set is [`cubature_points`](@ref): `2n` points, ``\xi^{(i)} = \sqrt{n}\
 
 ## Prediction
 
-The filter points are
+The filter points use the posterior factor ``S_{k-1|k-1}``:
 
 ```math
-\chi^{(i)} = x + S \xi^{(i)}.
+\chi_{k-1|k-1}^{(i)} = x_{k-1|k-1} + S_{k-1|k-1} \xi^{(i)}.
 ```
 
 Pass each point through the noise-free model and set
 
 ```math
-\hat x = \sum_{i=1}^{2n} \frac{1}{2n}\, f(t, \chi^{(i)}, \Delta t), \qquad
-d^{(i)} = f(t, \chi^{(i)}, \Delta t) - \hat x.
+x_{k|k-1} = \sum_{i=1}^{2n} \frac{1}{2n}\, f\bigl(t_{k-1}, \chi_{k-1|k-1}^{(i)}, \Delta t\bigr), \qquad
+d^{(i)} = f\bigl(t_{k-1}, \chi_{k-1|k-1}^{(i)}, \Delta t\bigr) - x_{k|k-1}.
 ```
 
-Let ``S_q`` satisfy ``Q = S_q S_q^\top``. The predicted factor is the thin QR of the columns ``\sqrt{1/(2n)}\, d^{(i)}`` together with the columns of ``S_q``. The stored factor is the sign-corrected ``R^\top``, the same QR path as a nonnegative-weight square-root CUT. No cubature weight is negative, so the predict does not downdate. The mean is ``\hat x`` and time advances by ``\Delta t``.
+Let ``S_q`` satisfy ``Q = S_q S_q^\top``. The prior factor ``S_{k|k-1}`` is the thin QR of the columns ``\sqrt{1/(2n)}\, d^{(i)}`` together with the columns of ``S_q``. The stored factor is the sign-corrected ``R^\top``, the same QR path as a nonnegative-weight square-root CUT. No cubature weight is negative, so the predict does not downdate. The prior mean is ``x_{k|k-1}`` and time advances by ``\Delta t``.
 
-`predict!` takes a [`DynamicsModel`](@ref) and a [`ProcessNoiseModel`](@ref). ``Q`` is `get_noise(process_noise_model, Δt)`. The ``2n`` cubature points are propagated by [`EnsemblePropagation`](@ref). The default `ensemblealg` is [`EnsembleSerial`](@ref). Pass [`EnsembleThreads`](@ref), [`EnsembleDistributed`](@ref), or [`EnsembleSplitThreads`](@ref) to change the parallelism. The returned `ODESolution` stores `[x; vec(Φ)]`, and ``\Phi P_{\mathrm{start}} \Phi^\top`` is the cubature covariance before ``Q`` is added.
+`predict!` takes a [`DynamicsModel`](@ref) and a [`ProcessNoiseModel`](@ref). ``Q`` is `get_noise(process_noise_model, Δt)`. The ``2n`` cubature points are propagated by [`EnsemblePropagation`](@ref). The default `ensemblealg` is [`EnsembleSerial`](@ref). Pass [`EnsembleThreads`](@ref), [`EnsembleDistributed`](@ref), or [`EnsembleSplitThreads`](@ref) to change the parallelism. The returned `ODESolution` stores `[x; vec(Φ)]`, and ``\Phi P_{k-1|k-1} \Phi^\top`` is the cubature covariance before ``Q`` is added.
 
 ## Update
 
-Redraw ``\chi^{(i)} = \hat x + S^- \xi^{(i)}`` and set ``\gamma^{(i)} = h(t, \chi^{(i)})``, ``\hat y = \sum_i w_i \gamma^{(i)}``. The innovation factor ``S_y`` is the same thin QR of the weighted measurement deviations and a factor of `R`. The cross-covariance is
+Redraw ``\chi_{k|k-1}^{(i)} = x_{k|k-1} + S_{k|k-1} \xi^{(i)}`` and set ``\gamma^{(i)} = h(t_k, \chi_{k|k-1}^{(i)})``, ``\hat y_{k|k-1} = \sum_i w_i \gamma^{(i)}``. The innovation factor ``S_{y,k|k-1}`` is the same thin QR of the weighted measurement deviations and a factor of `R`. The cross-covariance is
 
 ```math
-P_{xy} = \sum_{i=1}^{2n} \frac{1}{2n} (\chi^{(i)} - \hat x)(\gamma^{(i)} - \hat y)^\top,
+P_{xy,k|k-1} = \sum_{i=1}^{2n} \frac{1}{2n}
+\bigl(\chi_{k|k-1}^{(i)} - x_{k|k-1}\bigr)
+\bigl(\gamma^{(i)} - \hat y_{k|k-1}\bigr)^\top,
 \qquad
-K = P_{xy} (S_y S_y^\top)^{-1}.
+K = P_{xy,k|k-1} \bigl(S_{y,k|k-1} S_{y,k|k-1}^\top\bigr)^{-1}.
 ```
 
-With ``U = K S_y``, the posterior factor downdates one column of `U` at a time,
+With ``U = K S_{y,k|k-1}``, the posterior factor ``S_{k|k}`` downdates one column of `U` at a time,
 
 ```math
-S^+ (S^+)^\top = S^- (S^-)^\top - \sum_{j=1}^{n_y} U_{:,j} U_{:,j}^\top,
+S_{k|k} S_{k|k}^\top = S_{k|k-1} S_{k|k-1}^\top - \sum_{j=1}^{n_y} U_{:,j} U_{:,j}^\top,
 ```
 
-and ``x \leftarrow x + K(y - \hat y)``. That is the additive update ``P - K S_y S_y^\top K^\top``. The downdate is the measurement update, not a negative cubature weight.
+and ``x_{k|k} = x_{k|k-1} + K\bigl(y_k - \hat y_{k|k-1}\bigr)``. That is the additive update ``P_{k|k-1} - K S_{y,k|k-1} S_{y,k|k-1}^\top K^\top``. The downdate is the measurement update, not a negative cubature weight.
 
 ## Two-body demo
 

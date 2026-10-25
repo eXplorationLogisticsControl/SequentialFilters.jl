@@ -17,7 +17,9 @@ The square-root filters keep a lower-triangular factor with a positive diagonal.
 
 ## Tutorials
 
-Each tutorial starts with why that filter exists and the papers to read, then the predict and update equations, then the same calls the two-body demos make. A quantity \(X\) after prediction is the prior \(X_{k:k-1}\); after the measurement update it is the posterior \(X_{k:k}\).
+The [two-body orbit](@ref twobody-tutorial) page walks through the shared scenario and the EKF demo.
+
+Each tutorial starts with why that filter exists and the papers to read, then the predict and update equations, then the same calls the two-body demos make. A quantity ``X`` after prediction is the prior ``X_{k|k-1}``; after the measurement update it is the posterior ``X_{k|k}``. The posterior carried into the next predict is ``X_{k-1|k-1}``.
 
 - [Extended Kalman filter (EKF)](@ref ekf-tutorial)
 - [Unscented Kalman filter (UKF)](@ref ukf-tutorial)

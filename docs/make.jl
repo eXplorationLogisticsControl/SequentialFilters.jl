@@ -20,6 +20,9 @@ makedocs(;
     checkdocs = :exports,
     pages = [
         "Home" => "index.md",
+        "Tutorials" => [
+            "Two-body orbit" => "tutorials/basic.md",
+        ],
         "Filters" => [
             "Extended Kalman filter (EKF)" => "filters/ekf.md",
             "Unscented Kalman filter (UKF)" => "filters/ukf.md",
