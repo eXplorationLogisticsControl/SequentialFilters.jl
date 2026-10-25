@@ -9,10 +9,13 @@ that generator already supports: `4` (CUT4, every `n ≥ 1`) or `6` (CUT6,
 
 The covariance is a lower Cholesky factor `S` with `P = S * S'` and a positive
 diagonal, the same convention as `SquareRootUnscentedKalmanFilter`. The
-constructor factors `P` once. Predict and update rebuild `S` from the CUT
-weights with a thin QR and, when a weight is negative, a Cholesky rank-one
-downdate. They do not form `P` and call `cholesky` again. The element type
-follows `eltype(x)` and `eltype(P)`, as in `ConjugateUnscentedKalmanFilter`.
+constructor factors `P` once. Predict rebuilds `S` from the CUT weights with a
+thin QR and, when a weight is negative, a Cholesky rank-one downdate. The
+measurement update forms the innovation factor the same way, then rebuilds the
+posterior factor with a Joseph QR of `[(S - K*C)'; (K*Sr)']`, where `C`
+satisfies `S * C' = Pxy` and `Sr` is a factor of `Sy*Sy' - C*C'`. They do not
+form `P` and call `cholesky` again. The element type follows `eltype(x)` and
+`eltype(P)`, as in `ConjugateUnscentedKalmanFilter`.
 
 CUT uses one weight for each sigma point, and that weight enters both the mean
 and the covariance. A positive weight `w` contributes the column
@@ -104,12 +107,15 @@ end
 `h(t, x)` is the noise-free measurement model. `y` is the measurement and `R`
 its additive covariance. The innovation factor uses the same QR and negative-weight
 downdate as `predict!`. The gain is `Pxy (Sy Sy')⁻¹`, with `Pxy` the CUT
-cross-covariance, and the posterior factor is downdated by each column of `K Sy`.
+cross-covariance. The posterior factor is the Joseph form
+`[(S - K*C)'; (K*Sr)']`, where `C` satisfies `S * C' = Pxy` and `Sr` is a
+factor of `Sy*Sy' - C*C'`.
 """
 function update!(filter::SquareRootConjugateUnscentedKalmanFilter, h, y, R)
     T = eltype(filter.x)
     yv = _measurement_vector(y, T)
     ny = length(yv)
+    nx = filter.nx
     Rm = _as_eltype(_square_matrix(R, ny, "R"), T)
     X, w = _srcut_sigma_points(filter)
     Y = Matrix{T}(undef, ny, size(X, 2))
@@ -128,13 +134,12 @@ function update!(filter::SquareRootConjugateUnscentedKalmanFilter, h, y, R)
     Sl = LowerTriangular(Sy)
     K = (Pxy / Sl') / Sl
     xnew = filter.x .+ K * (yv .- yhat)
-    U = K * Sy
-    Snew = copy(filter.S)
-    for j in 1:ny
-        _cholesky_rank1!(Snew, U[:, j], -1)
-    end
+    C = (LowerTriangular(filter.S) \ Pxy)'
+    IKS = filter.S - K * C
+    Sr = _noise_factor(_symmetrize(Sy * Sy' - C * C'))
+    Kr = size(Sr, 2) == 0 ? zeros(T, nx, 0) : K * Sr
+    filter.S .= _qr_lower_factor(size(Kr, 2) == 0 ? IKS' : vcat(IKS', Kr'))
     filter.x .= xnew
-    filter.S .= Snew
     return nothing
 end
 

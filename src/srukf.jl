@@ -11,8 +11,9 @@ come from `unscented_weights` (the same scaled convention as
 The time update takes a thin QR of the weighted propagated sigma points that
 have positive covariance weight, together with a process-noise factor, then a
 Cholesky rank-one downdate when the center weight is negative. The measurement
-update does the same for the predicted measurement, forms the gain from that
-factor, and applies a Cholesky rank-one downdate for each column of `K * Sy`.
+update forms the innovation factor the same way, then rebuilds the posterior
+factor with a Joseph QR of `[(S - K*C)'; (K*Sr)']`, where `C` satisfies
+`S * C' = Pxy` and `Sr` is a factor of `Sy*Sy' - C*C'`.
 No Jacobians are required.
 """
 mutable struct SquareRootUnscentedKalmanFilter
@@ -96,6 +97,11 @@ end
 
 `h(t, x)` is the noise-free measurement model. `y` is the measurement and `R`
 its additive covariance.
+
+The innovation factor is the QR-and-downdate of the weighted measurement
+deviations and a factor of `R`. The posterior factor is the Joseph form
+`[(S - K*C)'; (K*Sr)']`, where `C` satisfies `S * C' = Pxy` and `Sr` is a
+factor of `Sy*Sy' - C*C'`.
 """
 function update!(filter::SquareRootUnscentedKalmanFilter, h, y, R)
     yv = _measurement_vector(y)
@@ -120,13 +126,12 @@ function update!(filter::SquareRootUnscentedKalmanFilter, h, y, R)
     Sl = LowerTriangular(Sy)
     K = (Pxy / Sl') / Sl
     xnew = filter.x .+ K * (yv .- yhat)
-    U = K * Sy
-    Snew = copy(filter.S)
-    for j in 1:ny
-        _cholesky_rank1!(Snew, U[:, j], -1)
-    end
+    C = (LowerTriangular(filter.S) \ Pxy)'
+    IKS = filter.S - K * C
+    Sr = _noise_factor(_symmetrize(Sy * Sy' - C * C'))
+    Kr = size(Sr, 2) == 0 ? zeros(nx, 0) : K * Sr
+    filter.S .= _qr_lower_factor(size(Kr, 2) == 0 ? IKS' : vcat(IKS', Kr'))
     filter.x .= xnew
-    filter.S .= Snew
     return nothing
 end
 
