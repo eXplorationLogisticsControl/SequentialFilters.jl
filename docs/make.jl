@@ -26,6 +26,7 @@ makedocs(;
             "Square-root EKF" => "tutorials/srekf.md",
             "Square-root UKF" => "tutorials/srukf.md",
             "Square-root CUT" => "tutorials/srcut.md",
+            "Square-root CKF" => "tutorials/srckf.md",
         ],
         "API" => "api.md",
     ],

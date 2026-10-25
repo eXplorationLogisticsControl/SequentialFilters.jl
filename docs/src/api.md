@@ -40,6 +40,8 @@ SquareRootConjugateUnscentedKalmanFilter
 ```@docs
 SquareRootExtendedKalmanFilter
 SquareRootUnscentedKalmanFilter
+SquareRootCubatureKalmanFilter
+cubature_points
 covariance
 ```
 

@@ -169,24 +169,27 @@ columns.
 """
 function _noise_factor(A::AbstractMatrix)
     M = _symmetrize(A)
+    T = eltype(M)
     n = size(M, 1)
     if norm(M) == 0
-        return zeros(n, 0)
+        return zeros(T, n, 0)
     end
     factorization = cholesky(Hermitian(M); check = false)
     if issuccess(factorization)
-        return Matrix(factorization.L)
+        return Matrix{T}(factorization.L)
     end
     ev = eigen(Symmetric(M))
-    scale = max(1.0, maximum(abs, ev.values))
-    tol = 1e-12 * scale
+    scale = max(one(T), T(maximum(abs, ev.values)))
+    # Float64 keeps the historical 1e-12 relative cutoff. Lower-precision
+    # values need a cutoff above their own roundoff, so the floor is 100 ulps.
+    tol = max(T(1e-12), 100 * eps(T)) * scale
     if any(<( -tol ), ev.values)
         throw(ArgumentError("noise covariance is not positive semidefinite"))
     end
-    vals = max.(ev.values, 0.0)
+    vals = max.(ev.values, zero(T))
     keep = vals .> tol
     if !any(keep)
-        return zeros(n, 0)
+        return zeros(T, n, 0)
     end
     return ev.vectors[:, keep] * Diagonal(sqrt.(vals[keep]))
 end

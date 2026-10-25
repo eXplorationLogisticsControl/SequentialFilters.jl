@@ -264,21 +264,34 @@ function _check_ukf_parameters(n::Int, alpha::Float64, beta::Float64, kappa::Flo
     return c
 end
 
+"""Element type shared by a filter state and covariance. Integers become `Float64`."""
+function _filter_eltype(x::AbstractVector, P::AbstractMatrix)
+    T = promote_type(eltype(x), eltype(P))
+    if T <: Integer
+        return Float64
+    end
+    T <: AbstractFloat || throw(ArgumentError("state and covariance must be real, got $T"))
+    return T
+end
+
 function _square_matrix(A, n::Int, name::AbstractString)
     if size(A) != (n, n)
         throw(DimensionMismatch("$name is $(size(A)); expected ($n, $n)"))
     end
-    M = Matrix{Float64}(A)
+    TA = eltype(A)
+    T = TA <: Integer ? Float64 : float(TA)
+    M = Matrix{T}(A)
     all(isfinite, M) || throw(ArgumentError("$name must contain only finite values"))
     return M
 end
 
-function _measurement_vector(y)
+function _measurement_vector(y, ::Type{T} = Float64) where {T <: AbstractFloat}
     if y isa Real
-        isfinite(Float64(y)) || throw(ArgumentError("measurement must be finite, got $y"))
-        return Float64[y]
+        yT = T(y)
+        isfinite(yT) || throw(ArgumentError("measurement must be finite, got $y"))
+        return T[yT]
     end
-    yv = collect(Float64, y)
+    yv = collect(T, y)
     length(yv) >= 1 || throw(ArgumentError("measurement must be non-empty"))
     all(isfinite, yv) || throw(ArgumentError("measurement must contain only finite values"))
     return yv
@@ -303,7 +316,8 @@ end
 
 function _weighted_column_mean(X::AbstractMatrix, w::AbstractVector)
     n, m = size(X)
-    μ = zeros(Float64, n)
+    T = promote_type(eltype(X), eltype(w))
+    μ = zeros(T, n)
     for i in 1:m
         wi = w[i]
         for j in 1:n
@@ -316,7 +330,8 @@ end
 """Covariance `Σ wᵢ (columnᵢ - μ) (columnᵢ - μ)ᵀ`."""
 function _deviation_covariance(X::AbstractMatrix, μ::AbstractVector, w::AbstractVector)
     n, m = size(X)
-    P = zeros(Float64, n, n)
+    T = promote_type(eltype(X), eltype(μ), eltype(w))
+    P = zeros(T, n, n)
     for i in 1:m
         d = X[:, i] .- μ
         P .+= w[i] .* (d * d')
@@ -334,7 +349,8 @@ function _cross_covariance(
 )
     nx, m = size(X)
     ny = size(Y, 1)
-    Pxy = zeros(Float64, nx, ny)
+    T = promote_type(eltype(X), eltype(Y), eltype(w), eltype(x), eltype(y))
+    Pxy = zeros(T, nx, ny)
     for i in 1:m
         dx = X[:, i] .- x
         dy = Y[:, i] .- y

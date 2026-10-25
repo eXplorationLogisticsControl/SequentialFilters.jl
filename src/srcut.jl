@@ -11,7 +11,8 @@ The covariance is a lower Cholesky factor `S` with `P = S * S'` and a positive
 diagonal, the same convention as `SquareRootUnscentedKalmanFilter`. The
 constructor factors `P` once. Predict and update rebuild `S` from the CUT
 weights with a thin QR and, when a weight is negative, a Cholesky rank-one
-downdate. They do not form `P` and call `cholesky` again.
+downdate. They do not form `P` and call `cholesky` again. The element type
+follows `eltype(x)` and `eltype(P)`, as in `ConjugateUnscentedKalmanFilter`.
 
 CUT uses one weight for each sigma point, and that weight enters both the mean
 and the covariance. A positive weight `w` contributes the column
@@ -25,10 +26,10 @@ applied in column order, each to the factor left by the previous downdate.
 
 No Jacobians are required.
 """
-mutable struct SquareRootConjugateUnscentedKalmanFilter
-    t::Float64
-    x::Vector{Float64}
-    S::Matrix{Float64}
+mutable struct SquareRootConjugateUnscentedKalmanFilter{T<:AbstractFloat}
+    t::T
+    x::Vector{T}
+    S::Matrix{T}
     nx::Int
     order::Int
 
@@ -45,8 +46,9 @@ mutable struct SquareRootConjugateUnscentedKalmanFilter
         end
         order_int = Int(order)
         _check_cut_support(nx, order_int)
-        S = Matrix(LowerTriangular(_lower_cholesky(P)))
-        return new(Float64(t), Vector{Float64}(x), S, nx, order_int)
+        T = _filter_eltype(x, P)
+        S = Matrix(LowerTriangular(_lower_cholesky(Matrix{T}(P))))
+        return new{T}(T(t), Vector{T}(x), S, nx, order_int)
     end
 end
 
@@ -70,15 +72,16 @@ process-noise covariance. Sigma points are `x + S ξ`, where `ξ` and the
 weights are `cut_points(n; order)`. `filter.t` advances by `Δt`.
 """
 function predict!(filter::SquareRootConjugateUnscentedKalmanFilter, f, Q, Δt::Real)
+    T = eltype(filter.x)
     nx = filter.nx
-    Qm = _square_matrix(Q, nx, "Q")
-    Δt64 = Float64(Δt)
-    isfinite(Δt64) || throw(ArgumentError("Δt must be finite, got $Δt"))
+    Qm = _as_eltype(_square_matrix(Q, nx, "Q"), T)
+    ΔtT = T(Δt)
+    isfinite(ΔtT) || throw(ArgumentError("Δt must be finite, got $Δt"))
     t = filter.t
     X, w = _srcut_sigma_points(filter)
-    Xprop = Matrix{Float64}(undef, nx, size(X, 2))
+    Xprop = Matrix{T}(undef, nx, size(X, 2))
     for i in axes(X, 2)
-        xi = f(t, X[:, i], Δt64)
+        xi = f(t, X[:, i], ΔtT)
         length(xi) == nx || throw(
             DimensionMismatch("f returned length $(length(xi)); expected $nx"),
         )
@@ -90,7 +93,7 @@ function predict!(filter::SquareRootConjugateUnscentedKalmanFilter, f, Q, Δt::R
     Snew = _srcut_factor(_column_deviations(Xprop, μ), w, _noise_factor(Qm))
     filter.x .= μ
     filter.S .= Snew
-    filter.t = t + Δt64
+    filter.t = t + ΔtT
     return nothing
 end
 
@@ -104,12 +107,12 @@ downdate as `predict!`. The gain is `Pxy (Sy Sy')⁻¹`, with `Pxy` the CUT
 cross-covariance, and the posterior factor is downdated by each column of `K Sy`.
 """
 function update!(filter::SquareRootConjugateUnscentedKalmanFilter, h, y, R)
-    yv = _measurement_vector(y)
+    T = eltype(filter.x)
+    yv = _measurement_vector(y, T)
     ny = length(yv)
-    Rm = _square_matrix(R, ny, "R")
-    nx = filter.nx
+    Rm = _as_eltype(_square_matrix(R, ny, "R"), T)
     X, w = _srcut_sigma_points(filter)
-    Y = Matrix{Float64}(undef, ny, size(X, 2))
+    Y = Matrix{T}(undef, ny, size(X, 2))
     for i in axes(X, 2)
         yi = h(filter.t, X[:, i])
         length(yi) == ny || throw(
@@ -136,8 +139,10 @@ function update!(filter::SquareRootConjugateUnscentedKalmanFilter, h, y, R)
 end
 
 
-function _srcut_sigma_points(filter::SquareRootConjugateUnscentedKalmanFilter)
-    ξ, w = cut_points(filter.nx; order = filter.order)
+function _srcut_sigma_points(filter::SquareRootConjugateUnscentedKalmanFilter{T}) where {T}
+    ξ64, w64 = cut_points(filter.nx; order = filter.order)
+    ξ = Matrix{T}(ξ64)
+    w = Vector{T}(w64)
     X = filter.S * ξ .+ reshape(filter.x, :, 1)
     return X, w
 end
@@ -149,15 +154,15 @@ Square-root covariance from CUT deviations and an additive noise factor.
 Positive weights enter the thin QR. Each negative weight is then a Cholesky
 rank-one downdate, in column order. Zero weights are skipped.
 """
-function _srcut_factor(dev::AbstractMatrix, w::AbstractVector, noise::AbstractMatrix)
+function _srcut_factor(dev::AbstractMatrix{T}, w::AbstractVector, noise::AbstractMatrix) where {T}
     n, m = size(dev)
     if length(w) != m
         throw(DimensionMismatch("expected $m weights, got $(length(w))"))
     end
-    pieces = Matrix{Float64}[]
-    negatives = Tuple{Int, Float64}[]
+    pieces = Matrix{T}[]
+    negatives = Tuple{Int, T}[]
     for i in 1:m
-        wi = w[i]
+        wi = T(w[i])
         if wi > 0
             push!(pieces, reshape(sqrt(wi) .* dev[:, i], n, 1))
         elseif wi < 0
@@ -167,7 +172,7 @@ function _srcut_factor(dev::AbstractMatrix, w::AbstractVector, noise::AbstractMa
         end
     end
     if size(noise, 2) > 0
-        push!(pieces, Matrix{Float64}(noise))
+        push!(pieces, Matrix{T}(noise))
     end
     isempty(pieces) && throw(ArgumentError("square-root CUT factor has no positive columns"))
     S = _qr_lower_factor(reduce(hcat, pieces)')

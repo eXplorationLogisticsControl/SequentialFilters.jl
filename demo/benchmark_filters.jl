@@ -125,6 +125,15 @@ function run_srukf(case)
     return filt
 end
 
+function run_srckf(case)
+    filt = SquareRootCubatureKalmanFilter(0.0, case.x_hat0, case.P0)
+    for k in 1:case.n_meas
+        predict!(filt, case.f, case.Q, case.Δt)
+        update!(filt, case.h, case.ys[k], case.R)
+    end
+    return filt
+end
+
 function _linear_model()
     Δt = 0.5
     F = [1.0 Δt 0.0 0.0 0.0 0.0;
@@ -241,11 +250,25 @@ function run_discrete_srukf()
     return filt
 end
 
+function run_discrete_srckf()
+    model = _linear_model()
+    filt = SquareRootCubatureKalmanFilter(0.0, model.x0, model.P0)
+    f = (t, x, dt) -> model.F * x
+    h = (t, x) -> model.H * x
+    for _ in 1:model.nsteps
+        predict!(filt, f, model.Q, 1.0)
+        update!(filt, h, model.y, model.R)
+    end
+    return filt
+end
+
 """
     print_filter_costs(case, pair)
 
-`pair` is `:ekf`, `:ukf`, or `:cut`. Prints two-body and linear-kernel costs for the
-covariance-form filter and its square-root form. The CUT pair uses order 4.
+`pair` is `:ekf`, `:ukf`, `:cut`, or `:srckf`. The first three print two-body and
+linear-kernel costs for the covariance-form filter and its square-root form.
+The CUT pair uses order 4. `:srckf` times the square-root cubature filter alone:
+this package has no covariance-form cubature filter to pair with it.
 """
 function print_filter_costs(case, pair::Symbol)
     println()
@@ -291,10 +314,18 @@ function print_filter_costs(case, pair::Symbol)
         _print_cost("CUT", covariance_cost)
         _print_cost("square-root CUT", square_root_cost)
         _print_ratio(covariance_cost, square_root_cost)
+    elseif pair == :srckf
+        println("two-body recursion (2n cubature points, one warmed run)")
+        square_root_cost = measure_cost(() -> run_srckf(case); samples = 1)
+        _print_cost("square-root CKF", square_root_cost)
+        println("linear kernel (6 states, 2 measurements, 5000 steps, fastest of 5 runs)")
+        square_root_cost = measure_cost(run_discrete_srckf; samples = 5)
+        _print_cost("square-root CKF", square_root_cost)
+        println("There is no covariance-form cubature filter in this package, so no ratio is printed.")
     else
-        throw(ArgumentError("pair must be :ekf, :ukf, or :cut, got $pair"))
+        throw(ArgumentError("pair must be :ekf, :ukf, :cut, or :srckf, got $pair"))
     end
-    println("On the two-body run both filters share the ODE propagation.")
+    println("On the two-body run the measured filters share the ODE propagation.")
     println("The linear kernel is the predict/update cost without that propagation.")
     return nothing
 end
