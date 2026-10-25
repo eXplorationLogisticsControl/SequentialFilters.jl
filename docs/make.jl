@@ -20,9 +20,10 @@ makedocs(;
     checkdocs = :exports,
     pages = [
         "Home" => "index.md",
-        "Tutorials" => [
+        "Filters" => [
             "Extended Kalman filter" => "tutorials/ekf.md",
             "Unscented Kalman filter" => "tutorials/ukf.md",
+            "Conjugate unscented filter" => "tutorials/cut.md",
             "Square-root EKF" => "tutorials/srekf.md",
             "Square-root UKF" => "tutorials/srukf.md",
             "Square-root CUT" => "tutorials/srcut.md",

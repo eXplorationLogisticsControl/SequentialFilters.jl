@@ -3,9 +3,10 @@
 Sequential filters for nonlinear state estimation.
 
 | Filter | Stored uncertainty | Noise |
-| --- | --- | --- |
+| :--- | :--- | :--- |
 | [`ExtendedKalmanFilter`](@ref) | covariance `P` | additive, through an ODE propagation |
 | [`UnscentedKalmanFilter`](@ref) | covariance `P` | additive |
+| [`ConjugateUnscentedKalmanFilter`](@ref) | covariance `P` | additive, CUT weights |
 | [`SquareRootExtendedKalmanFilter`](@ref) | lower factor `S` with `P = S*S'` | additive |
 | [`SquareRootUnscentedKalmanFilter`](@ref) | lower factor `S` with `P = S*S'` | additive |
 | [`SquareRootConjugateUnscentedKalmanFilter`](@ref) | lower factor `S` with `P = S*S'` | additive, CUT weights |
@@ -14,10 +15,11 @@ The square-root filters keep a lower-triangular factor with a positive diagonal.
 
 ## Tutorials
 
-Each tutorial states the predict and update equations, then the same calls the two-body demos make.
+Each tutorial starts with why that filter exists and the papers to read, then the predict and update equations, then the same calls the two-body demos make. A quantity \(X\) after prediction is the prior \(X_{k:k-1}\); after the measurement update it is the posterior \(X_{k:k}\).
 
 - [Extended Kalman filter](@ref ekf-tutorial)
 - [Unscented Kalman filter](@ref ukf-tutorial)
+- [Conjugate unscented filter](@ref cut-tutorial)
 - [Square-root EKF](@ref srekf-tutorial)
 - [Square-root UKF](@ref srukf-tutorial)
 - [Square-root CUT](@ref srcut-tutorial)
@@ -30,6 +32,7 @@ The demos share the two-body problem in `demo/demo_twobody_ekf.jl`: a 7000 km or
 julia --project=. -e 'using Pkg; Pkg.test()'
 julia --project=demo demo/demo_twobody_ekf.jl
 julia --project=demo demo/demo_ukf.jl
+julia --project=demo demo/demo_cut.jl
 julia --project=demo demo/demo_srekf.jl
 julia --project=demo demo/demo_srukf.jl
 julia --project=demo demo/demo_srcut.jl

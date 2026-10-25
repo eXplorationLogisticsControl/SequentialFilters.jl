@@ -10,21 +10,37 @@ Weights and ``\lambda`` are [`unscented_weights`](@ref), the same scaled convent
 
 With the defaults, the center covariance weight is negative. The time and measurement updates put the positive weights into a thin QR, then apply a Cholesky rank-one downdate for that negative weight. The two-body demo is `demo/demo_srukf.jl`.
 
+## Motivation
+
+The [UKF](@ref ukf-tutorial) already spends a Cholesky of ``P`` to form sigma points, then rebuilds ``P`` from a weighted outer-product sum. The default center covariance weight is negative, so that sum is not a Gram matrix: forming ``P`` and factoring it again is both wasteful and a place for roundoff to destroy definiteness. The square-root UKF keeps ``S``, draws sigma points from its columns, puts the positive-weight deviations into a thin QR with a process-noise factor, and applies a Cholesky rank-one downdate for the negative center weight.
+
+Use it whenever you would use the UKF and want the stored uncertainty to remain a valid factor. The mean, scaled weights, and additive-noise model are those of [`UnscentedKalmanFilter`](@ref). The extra cost relative to the covariance form is the QR and the downdate; the two-body pair still propagates the same ``2n+1`` points.
+
+**Further reading.**
+
+- van der Merwe, R., and Wan, E. A. (2001). [The Square-Root Unscented Kalman Filter for State and Parameter-Estimation](https://doi.org/10.1109/ICASSP.2001.940586). *Proc. IEEE International Conference on Acoustics, Speech, and Signal Processing*, 3461–3464.
+- van der Merwe, R. (2004). *Sigma-Point Kalman Filters for Probabilistic Inference in Dynamic State-Space Models*. PhD dissertation, OGI School of Science & Engineering, Oregon Health & Science University.
+
+The scaled weights are those of Wan and van der Merwe (2000), cited on the [UKF page](@ref ukf-tutorial).
+
 ## Prediction
 
-Sigma points use the stored factor in place of a Cholesky factor of `P`:
+Sigma points use the stored posterior factor in place of a Cholesky factor of ``P_{k-1:k-1}``:
 
 ```math
-\chi^{(0)} = x, \qquad
-\chi^{(i)} = x + \sqrt{c}\, S_{:,i}, \qquad
-\chi^{(n+i)} = x - \sqrt{c}\, S_{:,i},
+\chi_{k-1:k-1}^{(0)} = x_{k-1:k-1}, \qquad
+\chi_{k-1:k-1}^{(i)} = x_{k-1:k-1} + \sqrt{c}\, \bigl(S_{k-1:k-1}\bigr)_{:,i},
 ```
 
-with ``c = n + \lambda``. Propagate ``\chi^{-(i)} = f(t, \chi^{(i)}, \Delta t)`` and
+```math
+\chi_{k-1:k-1}^{(n+i)} = x_{k-1:k-1} - \sqrt{c}\, \bigl(S_{k-1:k-1}\bigr)_{:,i},
+```
+
+with ``c = n + \lambda``. Propagate ``\chi_{k:k-1}^{(i)} = f\bigl(t_{k-1}, \chi_{k-1:k-1}^{(i)}, \Delta t\bigr)`` and
 
 ```math
-\hat x = \sum_{i=0}^{2n} W_m^{(i)}\, \chi^{-(i)}, \qquad
-d^{(i)} = \chi^{-(i)} - \hat x.
+x_{k:k-1} = \sum_{i=0}^{2n} W_m^{(i)}\, \chi_{k:k-1}^{(i)}, \qquad
+d^{(i)} = \chi_{k:k-1}^{(i)} - x_{k:k-1}.
 ```
 
 Let ``S_q`` satisfy ``Q = S_q S_q^\top``. Columns ``\sqrt{W_c^{(i)}}\, d^{(i)}`` with ``W_c^{(i)} > 0``, and the columns of ``S_q``, form the matrix whose thin QR becomes a lower factor ``S_{\mathrm{qr}}`` by the same sign-flip rule as the [Square-root EKF](@ref srekf-tutorial). Outer weights ``i \ge 1`` are required to be positive.
@@ -32,52 +48,67 @@ Let ``S_q`` satisfy ``Q = S_q S_q^\top``. Columns ``\sqrt{W_c^{(i)}}\, d^{(i)}``
 If ``W_c^{(0)} > 0``, the center column is included in that QR. If ``W_c^{(0)} < 0``, it is a rank-one downdate:
 
 ```math
-S^- (S^-)^\top
+S_{k:k-1} S_{k:k-1}^\top
   = S_{\mathrm{qr}} S_{\mathrm{qr}}^\top
   - \big(\sqrt{-W_c^{(0)}}\, d^{(0)}\big)
     \big(\sqrt{-W_c^{(0)}}\, d^{(0)}\big)^\top.
 ```
 
-For a lower factor `L` and a vector `w`, one rank-one step with sign ``\sigma = \pm 1`` walks ``k = 1,\ldots,n``:
+For a lower factor `L` and a vector `w`, one rank-one step with sign ``\sigma = \pm 1`` walks ``\ell = 1,\ldots,n``:
 
 ```math
-r = \sqrt{L_{kk}^2 + \sigma w_k^2}, \quad
-c_k = r / L_{kk}, \quad
-s_k = w_k / L_{kk}, \quad
-L_{kk} \leftarrow r,
+r = \sqrt{L_{\ell\ell}^2 + \sigma w_\ell^2}, \quad
+c_\ell = r / L_{\ell\ell}, \quad
+s_\ell = w_\ell / L_{\ell\ell}, \quad
+L_{\ell\ell} \leftarrow r,
 ```
 
 ```math
-L_{jk} \leftarrow (L_{jk} + \sigma s_k w_j) / c_k, \qquad
-w_j \leftarrow c_k w_j - s_k L_{jk}^{\mathrm{new}}, \qquad j > k.
+L_{j\ell} \leftarrow (L_{j\ell} + \sigma s_\ell w_j) / c_\ell, \qquad
+w_j \leftarrow c_\ell w_j - s_\ell L_{j\ell}^{\mathrm{new}}, \qquad j > \ell.
 ```
 
-``\sigma = -1`` is the downdate. The diagonal stays positive, or the step errors if the downdate would lose definiteness. The mean is ``\hat x`` and time advances by ``\Delta t``.
+``\sigma = -1`` is the downdate. The diagonal stays positive, or the step errors if the downdate would lose definiteness. The mean is ``x_{k:k-1}`` and time advances by ``\Delta t``.
 
 ## Update
 
-Redraw sigma points from ``(\hat x, S^-)`` and set ``\gamma^{(i)} = h(t, \chi^{(i)})``, ``\hat y = \sum W_m^{(i)} \gamma^{(i)}``. The innovation factor ``S_y`` is the same QR-and-downdate map applied to the measurement deviations and a factor of `R`:
+Redraw sigma points from ``\bigl(x_{k:k-1}, S_{k:k-1}\bigr)`` and set ``\gamma^{(i)} = h\bigl(t_k, \chi_{k:k-1}^{(i)}\bigr)``, ``\hat y_{k:k-1} = \sum W_m^{(i)} \gamma^{(i)}``. The innovation factor ``S_{y,k:k-1}`` is the same QR-and-downdate map applied to the measurement deviations and a factor of `R`:
 
 ```math
-S_y S_y^\top
-  = \sum_{i=0}^{2n} W_c^{(i)} (\gamma^{(i)} - \hat y)(\gamma^{(i)} - \hat y)^\top + R.
+S_{y,k:k-1} S_{y,k:k-1}^\top
+  = \sum_{i=0}^{2n} W_c^{(i)}
+    \bigl(\gamma^{(i)} - \hat y_{k:k-1}\bigr)
+    \bigl(\gamma^{(i)} - \hat y_{k:k-1}\bigr)^\top + R.
 ```
 
 The cross-covariance is the weighted outer product used by the covariance-form UKF,
 
 ```math
-P_{xy} = \sum_{i=0}^{2n} W_c^{(i)} (\chi^{(i)} - \hat x)(\gamma^{(i)} - \hat y)^\top,
-\qquad
-K = P_{xy} (S_y S_y^\top)^{-1}.
+P_{xy,k:k-1} = \sum_{i=0}^{2n} W_c^{(i)}
+    \bigl(\chi_{k:k-1}^{(i)} - x_{k:k-1}\bigr)
+    \bigl(\gamma^{(i)} - \hat y_{k:k-1}\bigr)^\top,
 ```
-
-With ``U = K S_y``, the posterior factor downdates one column of `U` at a time:
 
 ```math
-S^+ (S^+)^\top = S^- (S^-)^\top - \sum_{j=1}^{n_y} U_{:,j} U_{:,j}^\top,
+K = P_{xy,k:k-1}
+    \bigl(S_{y,k:k-1} S_{y,k:k-1}^\top\bigr)^{-1}.
 ```
 
-and ``x \leftarrow x + K(y - \hat y)``. This is ``P - K S_y S_y^\top K^\top``, the additive square-root measurement update.
+With ``U = K S_{y,k:k-1}``, the posterior factor downdates one column of `U` at a time:
+
+```math
+S_{k:k} S_{k:k}^\top
+  = S_{k:k-1} S_{k:k-1}^\top
+    - \sum_{j=1}^{n_y} U_{:,j} U_{:,j}^\top,
+```
+
+and
+
+```math
+x_{k:k} = x_{k:k-1} + K\bigl(y_{k} - \hat y_{k:k-1}\bigr).
+```
+
+This is ``P_{k:k} = P_{k:k-1} - K S_{y,k:k-1} S_{y,k:k-1}^\top K^\top``, the additive square-root measurement update.
 
 ## Two-body demo
 
