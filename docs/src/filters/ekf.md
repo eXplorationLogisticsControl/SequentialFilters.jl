@@ -2,7 +2,7 @@
 
 `ExtendedKalmanFilter` stores the mean `x` and the covariance `P`. The predict step integrates continuous dynamics and a state-transition matrix. The update uses the measurement Jacobian and the Joseph form.
 
-The two-body demo is `demo/demo_ekf.jl`.
+The two-body demo is `demo/twobody/demo_ekf.jl`.
 
 ## Motivation
 
@@ -73,7 +73,7 @@ P_{k:k}
 
 ## Two-body demo
 
-The script below is the filter loop from `demo/demo_ekf.jl`. Dynamics, initial conditions, range and range-rate measurements, and the noise covariances are the shared two-body case. The figure records the estimation error, which is the estimate minus the truth, together with ``\pm 3\sqrt{P_{ii}}``.
+The script below is the filter loop from `demo/twobody/demo_ekf.jl`. Dynamics, initial conditions, range and range-rate measurements, and the noise covariances are the shared two-body case. The figure records the estimation error, which is the estimate minus the truth, together with ``\pm 3\sqrt{P_{ii}}``.
 
 ```julia
 using SequentialFilters
@@ -89,19 +89,19 @@ for k in 1:n_meas
 end
 ```
 
-`get_h_H(t, x)` returns `(range_rangerate(t, x), H)` with `H` from `ForwardDiff`. The full script also samples the predicted trajectory between measurements and writes `demo/twobody_ekf_errors.png`.
+`get_h_H(t, x)` returns `(range_rangerate(t, x), H)` with `H` from `ForwardDiff`. The full script also samples the predicted trajectory between measurements and writes `demo/twobody/plots/twobody_ekf_errors.png`.
 
 After the figure, the demo prints elapsed time, process CPU time, and allocations for this filter and the square-root EKF. The two-body pair both integrate `twobody!`. The linear kernel is 5000 steps of a 6-state model with constant `F` and `H` and no ODE: the covariance column is the same Joseph update as above, with ``x_{k:k-1} = F x_{k-1:k-1}`` and ``P_{k:k-1} = F P_{k-1:k-1} F^\top + Q``, and the other column is [`SquareRootExtendedKalmanFilter`](@ref).
 
 ```julia
-include(joinpath(@__DIR__, "benchmark_filters.jl"))
+include(joinpath(@__DIR__, "..", "benchmark_filters.jl"))
 print_filter_costs(load_twobody_case(), :ekf)
 ```
 
 Run it with
 
 ```bash
-julia --project=demo demo/demo_ekf.jl
+julia --project=demo demo/twobody/demo_ekf.jl
 ```
 
 ## Same calls on a coasting state

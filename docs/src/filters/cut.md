@@ -2,7 +2,7 @@
 
 `ConjugateUnscentedKalmanFilter` is the conjugate unscented Kalman filter of Adurthi, Singla, and Singh, with additive process and measurement noise. It stores the mean `x` and the covariance `P`. No Jacobians are required.
 
-Sigma points and weights come from [`cut_points`](@ref). The default `order` is `4`. CUT4 is defined for every state dimension `n ≥ 1`. CUT6 is defined for `2 ≤ n ≤ 9`. Order 8 is not implemented. Each point carries one weight, and that same weight is used for the mean and the covariance. On the supported dimensions the weights are nonnegative. The two-body demo is `demo/demo_cut.jl` and uses order 4.
+Sigma points and weights come from [`cut_points`](@ref). The default `order` is `4`. CUT4 is defined for every state dimension `n ≥ 1`. CUT6 is defined for `2 ≤ n ≤ 9`. Order 8 is not implemented. Each point carries one weight, and that same weight is used for the mean and the covariance. On the supported dimensions the weights are nonnegative. The two-body demo is `demo/twobody/demo_cut.jl` and uses order 4.
 
 ## Motivation
 
@@ -77,7 +77,7 @@ P_{k:k}
 
 ## Two-body demo
 
-`demo/demo_cut.jl` uses the same 7000 km orbit, initial mean and covariance, range and range-rate measurements, and noise as the EKF demo. Process noise is an [`UnbiasedRandomProcess`](@ref) with scale `1e-6`. The filter order is 4. The figure samples the returned `ODESolution` and draws the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``, written to `demo/twobody_cut_errors.png`.
+`demo/twobody/demo_cut.jl` uses the same 7000 km orbit, initial mean and covariance, range and range-rate measurements, and noise as the EKF demo. Process noise is an [`UnbiasedRandomProcess`](@ref) with scale `1e-6`. The filter order is 4. The figure samples the returned `ODESolution` and draws the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``, written to `demo/twobody/plots/twobody_cut_errors.png`.
 
 ```julia
 using SequentialFilters
@@ -93,10 +93,10 @@ end
 
 The default propagation is `ensemblealg = EnsembleSerial()`. Pass `EnsembleThreads()`, `EnsembleDistributed()`, or `EnsembleSplitThreads()` to run the CUT points in parallel.
 
-`demo/demo_srcut.jl` prints elapsed time, process CPU time, and allocations for this filter and the square-root CUT. Both two-body runs propagate the same CUT4 points. The linear kernel is 5000 steps of a 6-state model with ``f(x) = Fx`` and no ODE.
+`demo/twobody/demo_srcut.jl` prints elapsed time, process CPU time, and allocations for this filter and the square-root CUT. Both two-body runs propagate the same CUT4 points. The linear kernel is 5000 steps of a 6-state model with ``f(x) = Fx`` and no ODE.
 
 ```bash
-julia --project=demo demo/demo_cut.jl
+julia --project=demo demo/twobody/demo_cut.jl
 ```
 
 ## Same calls on a linear model

@@ -1,8 +1,8 @@
-# [Bootstrap particle filter](@id particle-tutorial)
+# [Bootstrap particle filter (PF)](@id pf-tutorial)
 
 `ParticleFilter` is a bootstrap sequential importance resampling filter with additive process and measurement noise. Particles are stored as columns of `particles`. `weights` sum to 1. `x` and `P` are the weighted sample mean and covariance (maximum-likelihood weights, not `1/(N-1)`).
 
-The constructor draws `n_particles` samples from `N(x, P)`. The default is 100. `resampling` is `:systematic` (the default) or `:multinomial`. Both draw exactly `n_particles` ancestors, so a resampling step does not change the count. `rng` supplies the initial draw, the process-noise samples, and the resampling. The two-body demo is `demo/demo_particle.jl` with 64 particles.
+The constructor draws `n_particles` samples from `N(x, P)`. The default is 100. `resampling` is `:systematic` (the default) or `:multinomial`. Both draw exactly `n_particles` ancestors, so a resampling step does not change the count. `rng` supplies the initial draw, the process-noise samples, and the resampling. The two-body demo is `demo/twobody/demo_particle.jl` with 64 particles.
 
 ## Motivation
 
@@ -41,7 +41,7 @@ Weights are normalized so they sum to 1. [`resample!`](@ref) then replaces the p
 
 ## Two-body demo
 
-`demo/demo_particle.jl` uses the EKF demo's orbit, initial condition, range and range-rate measurements, and noise. The filter has 64 particles and a fixed random stream. The figure samples the returned `ODESolution` and draws the estimation error with bands ``\pm 3\sqrt{P_{ii}}``. The figure is `demo/twobody_particle_errors.png`.
+`demo/twobody/demo_particle.jl` uses the EKF demo's orbit, initial condition, range and range-rate measurements, and noise. The filter has 64 particles and a fixed random stream. The figure samples the returned `ODESolution` and draws the estimation error with bands ``\pm 3\sqrt{P_{ii}}``. The figure is `demo/twobody/plots/twobody_particle_errors.png`.
 
 ```julia
 using SequentialFilters
@@ -65,12 +65,12 @@ print_filter_costs(case, :particle)
 ```
 
 ```bash
-julia --project=demo demo/demo_particle.jl
+julia --project=demo demo/twobody/demo_particle.jl
 ```
 
 ## Same calls on a linear model
 
-```@example particle-step
+```@example pf-step
 using LinearAlgebra
 using Random
 using SequentialFilters

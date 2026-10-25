@@ -8,7 +8,7 @@ P = S S^\top.
 
 The constructor factors `P` once. Later steps do not form `P` and call `cholesky`. The element type follows `eltype(x)` and `eltype(P)`.
 
-The point set is [`cubature_points`](@ref): `2n` points, ``\xi^{(i)} = \sqrt{n}\, e_i`` and ``\xi^{(n+i)} = -\sqrt{n}\, e_i``, each with weight ``1/(2n)``. Every weight is positive and the weights sum to one. The third-degree spherical-radial rule integrates polynomials through total degree 3 exactly, so a linear-Gaussian predict and update match the Kalman filter up to roundoff. The two-body demo is `demo/demo_srckf.jl`.
+The point set is [`cubature_points`](@ref): `2n` points, ``\xi^{(i)} = \sqrt{n}\, e_i`` and ``\xi^{(n+i)} = -\sqrt{n}\, e_i``, each with weight ``1/(2n)``. Every weight is positive and the weights sum to one. The third-degree spherical-radial rule integrates polynomials through total degree 3 exactly, so a linear-Gaussian predict and update match the Kalman filter up to roundoff. The two-body demo is `demo/twobody/demo_srckf.jl`.
 
 ## Prediction
 
@@ -49,7 +49,7 @@ and ``x \leftarrow x + K(y - \hat y)``. That is the additive update ``P - K S_y 
 
 ## Two-body demo
 
-`demo/demo_srckf.jl` uses the EKF demo's two-body dynamics, initial condition, range and range-rate measurements, and noise. The plotted error is the estimate minus the truth, sampled along the returned `ODESolution`. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``. The figure is written to `demo/twobody_srckf_errors.png`.
+`demo/twobody/demo_srckf.jl` uses the EKF demo's two-body dynamics, initial condition, range and range-rate measurements, and noise. The plotted error is the estimate minus the truth, sampled along the returned `ODESolution`. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``. The figure is written to `demo/twobody/plots/twobody_srckf_errors.png`.
 
 ```julia
 using SequentialFilters
@@ -72,7 +72,7 @@ print_filter_costs(case, :srckf)
 ```
 
 ```bash
-julia --project=demo demo/demo_srckf.jl
+julia --project=demo demo/twobody/demo_srckf.jl
 ```
 
 ## Same calls on a linear model

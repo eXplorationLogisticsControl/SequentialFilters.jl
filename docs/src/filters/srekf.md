@@ -8,7 +8,7 @@ P = S S^\top.
 
 The constructor factors `P` once. Later predict and update steps rebuild `S` with a thin QR. They do not form `P` and call `cholesky` again. `covariance(filter)` returns the symmetrized product ``SS^\top``.
 
-`h` is nonlinear. Its Jacobian is an `ny × nx` matrix or a function of `(t, x)`. Process and measurement noise are additive. The two-body demo is `demo/demo_srekf.jl`. On a [`NonlinearODEModel`](@ref), `F` is the state-transition matrix from the same propagation the EKF uses. This filter follows one trajectory, so `predict!` has no `ensemblealg` keyword.
+`h` is nonlinear. Its Jacobian is an `ny × nx` matrix or a function of `(t, x)`. Process and measurement noise are additive. The two-body demo is `demo/twobody/demo_srekf.jl`. On a [`NonlinearODEModel`](@ref), `F` is the state-transition matrix from the same propagation the EKF uses. This filter follows one trajectory, so `predict!` has no `ensemblealg` keyword.
 
 ## Motivation
 
@@ -92,7 +92,7 @@ x_{k:k} = x_{k:k-1} + K\bigl(y_{k} - \hat y_{k:k-1}\bigr).
 
 ## Two-body demo
 
-`demo/demo_srekf.jl` loads the EKF demo's orbit, initial condition, measurements, `R`, and `Q`. The error plotted is the estimate minus the truth. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``.
+`demo/twobody/demo_srekf.jl` loads the EKF demo's orbit, initial condition, measurements, `R`, and `Q`. The error plotted is the estimate minus the truth. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``.
 
 ```julia
 using SequentialFilters
@@ -114,7 +114,7 @@ print_filter_costs(case, :ekf)
 ```
 
 ```bash
-julia --project=demo demo/demo_srekf.jl
+julia --project=demo demo/twobody/demo_srekf.jl
 ```
 
 ## Same calls on a linear model

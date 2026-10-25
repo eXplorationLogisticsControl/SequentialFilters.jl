@@ -28,7 +28,7 @@ makedocs(;
             "Square-root UKF (SRUKF)" => "filters/srukf.md",
             "Square-root CUT (SRCUT)" => "filters/srcut.md",
             "Square-root CKF (SRCKF)" => "filters/srckf.md",
-            "Bootstrap particle filter" => "filters/particle.md",
+            "Bootstrap particle filter (PF)" => "filters/pf.md",
         ],
         "API" => "api.md",
     ],

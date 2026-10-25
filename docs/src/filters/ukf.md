@@ -2,7 +2,7 @@
 
 `UnscentedKalmanFilter` is the scaled unscented Kalman filter of Wan and van der Merwe, with additive process and measurement noise. It stores the mean `x` and the covariance `P`. No Jacobians are required.
 
-Defaults are `alpha = 1e-3`, `beta = 2`, and `kappa = 0`. Weights come from [`unscented_weights`](@ref). The two-body demo is `demo/demo_ukf.jl`.
+Defaults are `alpha = 1e-3`, `beta = 2`, and `kappa = 0`. Weights come from [`unscented_weights`](@ref). The two-body demo is `demo/twobody/demo_ukf.jl`.
 
 ## Motivation
 
@@ -101,7 +101,7 @@ P_{k:k}
 
 ## Two-body demo
 
-`demo/demo_ukf.jl` uses the dynamics, initial mean and covariance, range and range-rate measurements, and noise from the EKF demo. Each sigma point is one trajectory of a [`NonlinearODEModel`](@ref). The figure samples the returned `ODESolution` between measurements and draws the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``, using ``\Phi P_{\mathrm{start}} \Phi^\top`` from that solution. The endpoint covariance includes ``Q``.
+`demo/twobody/demo_ukf.jl` uses the dynamics, initial mean and covariance, range and range-rate measurements, and noise from the EKF demo. Each sigma point is one trajectory of a [`NonlinearODEModel`](@ref). The figure samples the returned `ODESolution` between measurements and draws the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``, using ``\Phi P_{\mathrm{start}} \Phi^\top`` from that solution. The endpoint covariance includes ``Q``.
 
 ```julia
 using SequentialFilters
@@ -124,7 +124,7 @@ print_filter_costs(case, :ukf)
 ```
 
 ```bash
-julia --project=demo demo/demo_ukf.jl
+julia --project=demo demo/twobody/demo_ukf.jl
 ```
 
 ## Same calls on a linear model

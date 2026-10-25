@@ -8,7 +8,7 @@ P = S S^\top.
 
 Weights and ``\lambda`` are [`unscented_weights`](@ref), the same scaled convention as [`UnscentedKalmanFilter`](@ref). Defaults are `alpha = 1e-3`, `beta = 2`, and `kappa = 0`. Sigma points are columns of `S` scaled by ``\sqrt{n+\lambda}``. No Jacobians are required.
 
-With the defaults, the center covariance weight is negative. The time update and the innovation factor put the positive weights into a thin QR, then apply a Cholesky rank-one downdate for that negative weight. The posterior factor is the Joseph QR in the update section. The two-body demo is `demo/demo_srukf.jl`.
+With the defaults, the center covariance weight is negative. The time update and the innovation factor put the positive weights into a thin QR, then apply a Cholesky rank-one downdate for that negative weight. The posterior factor is the Joseph QR in the update section. The two-body demo is `demo/twobody/demo_srukf.jl`.
 
 ## Motivation
 
@@ -146,7 +146,7 @@ For the optimal gain this matches ``P_{k:k-1} - K S_{y,k:k-1} S_{y,k:k-1}^\top K
 
 ## Two-body demo
 
-`demo/demo_srukf.jl` uses the EKF demo's two-body dynamics, initial condition, range and range-rate measurements, and noise. The plotted error is the estimate minus the truth, sampled along the returned `ODESolution`. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``. The figure is `demo/twobody_srukf_errors.png`.
+`demo/twobody/demo_srukf.jl` uses the EKF demo's two-body dynamics, initial condition, range and range-rate measurements, and noise. The plotted error is the estimate minus the truth, sampled along the returned `ODESolution`. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``. The figure is `demo/twobody/plots/twobody_srukf_errors.png`.
 
 ```julia
 using SequentialFilters
@@ -169,7 +169,7 @@ print_filter_costs(case, :ukf)
 ```
 
 ```bash
-julia --project=demo demo/demo_srukf.jl
+julia --project=demo demo/twobody/demo_srukf.jl
 ```
 
 ## Same calls on a linear model

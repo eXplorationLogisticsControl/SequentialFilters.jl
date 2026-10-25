@@ -8,7 +8,7 @@ P = S S^\top,
 
 and a positive diagonal. This is the same factor convention as the square-root UKF. The constructor factors `P` once. Later steps do not form `P` and call `cholesky`.
 
-Sigma points and weights come from [`cut_points`](@ref). The default `order` is `4`. Supported orders are CUT4 for every state dimension `n ≥ 1`, and CUT6 for `2 ≤ n ≤ 9`. CUT uses one weight per point for both the mean and the covariance. The two-body demo is `demo/demo_srcut.jl` and uses order 4.
+Sigma points and weights come from [`cut_points`](@ref). The default `order` is `4`. Supported orders are CUT4 for every state dimension `n ≥ 1`, and CUT6 for `2 ≤ n ≤ 9`. CUT uses one weight per point for both the mean and the covariance. The two-body demo is `demo/twobody/demo_srcut.jl` and uses order 4.
 
 ## Motivation
 
@@ -136,7 +136,7 @@ For the optimal gain this matches ``P_{k:k-1} - K S_{y,k:k-1} S_{y,k:k-1}^\top K
 
 ## Two-body demo
 
-`demo/demo_srcut.jl` uses the EKF demo's two-body dynamics, initial condition, range and range-rate measurements, and noise. The filter order is 4. The plotted error is the estimate minus the truth, sampled along the returned `ODESolution`. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``. The figure is written to `demo/twobody_srcut_errors.png`.
+`demo/twobody/demo_srcut.jl` uses the EKF demo's two-body dynamics, initial condition, range and range-rate measurements, and noise. The filter order is 4. The plotted error is the estimate minus the truth, sampled along the returned `ODESolution`. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``. The figure is written to `demo/twobody/plots/twobody_srcut_errors.png`.
 
 ```julia
 using SequentialFilters
@@ -159,7 +159,7 @@ print_filter_costs(case, :cut)
 ```
 
 ```bash
-julia --project=demo demo/demo_srcut.jl
+julia --project=demo demo/twobody/demo_srcut.jl
 ```
 
 ## Same calls on a linear model
