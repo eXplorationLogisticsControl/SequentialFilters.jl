@@ -3,6 +3,8 @@ Two-body orbit tracking with the square-root unscented Kalman filter.
 
 Dynamics, initial conditions, sensor, and noise match `demo/demo_twobody_ekf.jl`.
 The figure shows error = estimate − truth and ±3√P[i,i], with P = S*S'.
+The script also prints elapsed time, process CPU time, and allocations
+for this filter and the UKF on the same problem.
 
     julia --project=demo demo/demo_srukf.jl
 """
@@ -19,6 +21,7 @@ using SequentialFilters
 
 include(joinpath(@__DIR__, "twobody_scenario.jl"))
 include(joinpath(@__DIR__, "plot_errors.jl"))
+include(joinpath(@__DIR__, "benchmark_filters.jl"))
 import SequentialFilters: predict!, update!, covariance
 
 function run_demo()
@@ -63,6 +66,7 @@ function run_demo()
         "Two-body square-root UKF\nerror = estimate − truth,  bands = ±3 √P[i,i]",
     )
     print_twobody_summary("square-root UKF two-body demo", err_hist, outfile)
+    print_filter_costs(case, :ukf)
     return nothing
 end
 
