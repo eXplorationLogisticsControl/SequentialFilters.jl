@@ -27,6 +27,7 @@ makedocs(;
             "Square-root EKF (SREKF)" => "filters/srekf.md",
             "Square-root UKF (SRUKF)" => "filters/srukf.md",
             "Square-root CUT (SRCUT)" => "filters/srcut.md",
+            "Square-root CKF (SRCKF)" => "filters/srckf.md",
         ],
         "API" => "api.md",
     ],

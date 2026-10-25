@@ -4,6 +4,19 @@ using Test
 
 using SequentialFilters
 
+# SR-CUT and full-covariance CUT are the same cubature written two ways.
+# With nonnegative weights the predicted factor is the thin QR of
+# [√wᵢ (χᵢ − x̄), Q^{1/2}], and that Gram matrix is the CUT covariance.
+# CUT4 and CUT6 weights are nonnegative, so those orders never take the
+# negative-weight downdate. The posterior downdate by the columns of K Sy
+# is the same rank-ny update as P − K Sy Syᵀ Kᵀ. The two recursions are
+# algebraically identical. They are not bit-identical: each QR and each
+# rank-one downdate moves the result by a few units in the last place.
+# On the linear-Gaussian systems below (P of order 1, condition number of
+# order 10, 12 to 20 steps) the Euclidean difference in the state and in P
+# measures below 10 ε(Float64). The tolerance is 100 ε(Float64) ≈ 2.2e-14.
+const SRCUT_LINEAR_ATOL = 100 * eps(Float64)
+
 function spd_lower_factor(S)
     @test istril(S)
     @test all(>(0), diag(S))
@@ -74,10 +87,10 @@ end
             nsteps = 15,
             seed = 20 + order,
             order = order,
-            y_atol = order == 4 ? 1e-8 : 1e-7,
+            y_atol = SRCUT_LINEAR_ATOL,
         )
-        @test max_x < (order == 4 ? 1e-8 : 1e-7)
-        @test max_P < (order == 4 ? 1e-8 : 1e-7)
+        @test max_x < SRCUT_LINEAR_ATOL
+        @test max_P < SRCUT_LINEAR_ATOL
     end
 
     max_x, max_P = compare_cut_srcut(;
@@ -90,10 +103,10 @@ end
         nsteps = 20,
         seed = 4,
         order = 4,
-        y_atol = 1e-8,
+        y_atol = SRCUT_LINEAR_ATOL,
     )
-    @test max_x < 1e-8
-    @test max_P < 1e-8
+    @test max_x < SRCUT_LINEAR_ATOL
+    @test max_P < SRCUT_LINEAR_ATOL
 
     max_x, max_P = compare_cut_srcut(;
         F = [0.9 0.1 0.0; 0.0 0.8 0.2; 0.0 0.0 0.95],
@@ -105,10 +118,10 @@ end
         nsteps = 12,
         seed = 6,
         order = 6,
-        y_atol = 1e-7,
+        y_atol = SRCUT_LINEAR_ATOL,
     )
-    @test max_x < 1e-7
-    @test max_P < 1e-7
+    @test max_x < SRCUT_LINEAR_ATOL
+    @test max_P < SRCUT_LINEAR_ATOL
 
     @test_throws ArgumentError SquareRootConjugateUnscentedKalmanFilter(
         0.0,
@@ -122,4 +135,65 @@ end
         Matrix{Float64}(I, 2, 2);
         order = 8,
     )
+end
+
+@testset "nonnegative CUT weights take the QR path" begin
+    for order in (4, 6)
+        dims = order == 4 ? (1, 2, 4, 6) : (2, 4, 6, 9)
+        for n in dims
+            _, w = cut_points(n; order = order)
+            @test all(>=(0), w)
+        end
+    end
+
+    rng = MersenneTwister(1)
+    n = 4
+    _, w = cut_points(n; order = 4)
+    dev = randn(rng, n, length(w))
+    Q = 0.1 * Matrix{Float64}(I, n, n) + fill(0.01, n, n)
+    Nq = Matrix(cholesky(Hermitian(Q)).L)
+    S = SequentialFilters._srcut_factor(dev, w, Nq)
+    cols = Matrix{Float64}[]
+    for i in eachindex(w)
+        w[i] > 0 && push!(cols, reshape(sqrt(w[i]) .* dev[:, i], n, 1))
+    end
+    push!(cols, Nq)
+    Sqr = SequentialFilters._qr_lower_factor(reduce(hcat, cols)')
+    @test S == Sqr
+
+    dev_neg = [1.0 0.0 0.2; 0.0 1.0 -0.3]
+    w_neg = [0.5, 0.5, -0.05]
+    Sneg = SequentialFilters._srcut_factor(dev_neg, w_neg, zeros(2, 0))
+    positive = hcat(sqrt(0.5) .* dev_neg[:, 1], sqrt(0.5) .* dev_neg[:, 2])
+    Smanual = SequentialFilters._qr_lower_factor(positive')
+    SequentialFilters._cholesky_rank1!(Smanual, sqrt(0.05) .* dev_neg[:, 3], -1)
+    @test Sneg ≈ Smanual atol = 0 rtol = 0
+end
+
+@testset "Float32 CUT and SR-CUT share one linear step" begin
+    x = Float32[1.0, -0.5]
+    P = Float32[1.0 0.2; 0.2 0.8]
+    Q = Float32(0.01) * Matrix{Float32}(I, 2, 2)
+    R = fill(Float32(0.05), 1, 1)
+    F = Float32[1.0 0.1; 0.0 1.0]
+    H = Float32[1.0 -0.2]
+    y = Float32(0.7)
+    for order in (4, 6)
+        cut = ConjugateUnscentedKalmanFilter(0.0, x, P; order = order)
+        sr = SquareRootConjugateUnscentedKalmanFilter(0.0, x, P; order = order)
+        @test eltype(cut.x) == Float32
+        @test eltype(cut.P) == Float32
+        @test eltype(sr.x) == Float32
+        @test eltype(sr.S) == Float32
+        f = (t, z, dt) -> F * z
+        h = (t, z) -> H * z
+        predict!(cut, f, Q, 1.0f0)
+        predict!(sr, f, Q, 1.0f0)
+        update!(cut, h, y, R)
+        update!(sr, h, y, R)
+        @test eltype(cut.P) == Float32
+        @test eltype(covariance(sr)) == Float32
+        @test sr.x ≈ cut.x atol = 1e-5
+        @test covariance(sr) ≈ cut.P atol = 1e-5
+    end
 end

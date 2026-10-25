@@ -163,7 +163,8 @@ end
 
 function _column_deviations(X, μ)
     n, m = size(X)
-    D = Matrix{Float64}(undef, n, m)
+    T = promote_type(eltype(X), eltype(μ))
+    D = Matrix{T}(undef, n, m)
     for i in 1:m
         for j in 1:n
             D[j, i] = X[j, i] - μ[j]
@@ -215,7 +216,7 @@ function _cholesky_rank1!(L::AbstractMatrix, x::AbstractVector, sign::Int)
     n = size(L, 1)
     length(x) == n || throw(DimensionMismatch("rank-one vector length $(length(x)); expected $n"))
     sign == 1 || sign == -1 || throw(ArgumentError("sign must be +1 or -1, got $sign"))
-    w = collect(Float64, x)
+    w = Vector{eltype(L)}(x)
     for k in 1:n
         Lkk = L[k, k]
         Lkk > 0 || throw(ArgumentError("Cholesky factor diagonal must be positive"))

@@ -25,12 +25,14 @@ cubature weight, and that same weight is used for the mean and the covariance.
 are added after the cubature. No Jacobians are required.
 
 The constructor copies `x` and `P`. Fields `t`, `x`, and `P` are the current
-time, mean, and covariance. `order` is `4` or `6`.
+time, mean, and covariance. `order` is `4` or `6`. The element type is the
+promotion of `eltype(x)` and `eltype(P)` (`Float64` when both are integers),
+so a `Float32` state and covariance run the cubature in `Float32`.
 """
-mutable struct ConjugateUnscentedKalmanFilter
-    t::Float64
-    x::Vector{Float64}
-    P::Matrix{Float64}
+mutable struct ConjugateUnscentedKalmanFilter{T<:AbstractFloat}
+    t::T
+    x::Vector{T}
+    P::Matrix{T}
     nx::Int
     order::Int
 
@@ -47,10 +49,11 @@ mutable struct ConjugateUnscentedKalmanFilter
         end
         order_int = Int(order)
         _check_cut_support(nx, order_int)
-        return new(
-            Float64(t),
-            Vector{Float64}(x),
-            Matrix{Float64}(P),
+        T = _filter_eltype(x, P)
+        return new{T}(
+            T(t),
+            Vector{T}(x),
+            Matrix{T}(P),
             nx,
             order_int,
         )
@@ -127,15 +130,16 @@ to the covariance. `filter.t` advances by `Δt`.
 are not used.
 """
 function predict!(filter::ConjugateUnscentedKalmanFilter, f, Q, Δt::Real)
+    T = eltype(filter.x)
     nx = filter.nx
-    Qm = _square_matrix(Q, nx, "Q")
-    Δt64 = Float64(Δt)
-    isfinite(Δt64) || throw(ArgumentError("Δt must be finite, got $Δt"))
+    Qm = _as_eltype(_square_matrix(Q, nx, "Q"), T)
+    ΔtT = T(Δt)
+    isfinite(ΔtT) || throw(ArgumentError("Δt must be finite, got $Δt"))
     t = filter.t
     X, w = _cut_sigma_points(filter)
-    Xprop = Matrix{Float64}(undef, nx, size(X, 2))
+    Xprop = Matrix{T}(undef, nx, size(X, 2))
     for i in axes(X, 2)
-        xi = f(t, X[:, i], Δt64)
+        xi = f(t, X[:, i], ΔtT)
         length(xi) == nx || throw(
             DimensionMismatch("f returned length $(length(xi)); expected $nx"),
         )
@@ -147,7 +151,7 @@ function predict!(filter::ConjugateUnscentedKalmanFilter, f, Q, Δt::Real)
     P = _deviation_covariance(Xprop, μ, w) + Qm
     filter.x .= μ
     filter.P .= _symmetrize(P)
-    filter.t = t + Δt64
+    filter.t = t + ΔtT
     return nothing
 end
 
@@ -168,14 +172,15 @@ Posterior covariance is the Joseph form
 innovation covariance and `Pxy` is the state–measurement cross-covariance.
 """
 function update!(filter::ConjugateUnscentedKalmanFilter, h, y, R)
-    yv = _measurement_vector(y)
+    T = eltype(filter.x)
+    yv = _measurement_vector(y, T)
     ny = length(yv)
-    Rm = _square_matrix(R, ny, "R")
+    Rm = _as_eltype(_square_matrix(R, ny, "R"), T)
     t = filter.t
     x_prior = filter.x
     P_prior = filter.P
     X, w = _cut_sigma_points(filter)
-    Y = Matrix{Float64}(undef, ny, size(X, 2))
+    Y = Matrix{T}(undef, ny, size(X, 2))
     for i in axes(X, 2)
         yi = h(t, X[:, i])
         length(yi) == ny || throw(
@@ -197,8 +202,14 @@ function update!(filter::ConjugateUnscentedKalmanFilter, h, y, R)
 end
 
 
-function _cut_sigma_points(filter::ConjugateUnscentedKalmanFilter)
-    ξ, w = cut_points(filter.nx; order = filter.order)
+function _as_eltype(A::AbstractMatrix, ::Type{T}) where {T}
+    return eltype(A) == T ? A : Matrix{T}(A)
+end
+
+function _cut_sigma_points(filter::ConjugateUnscentedKalmanFilter{T}) where {T}
+    ξ64, w64 = cut_points(filter.nx; order = filter.order)
+    ξ = Matrix{T}(ξ64)
+    w = Vector{T}(w64)
     L = _lower_cholesky(filter.P)
     X = L * ξ .+ reshape(filter.x, :, 1)
     return X, w
