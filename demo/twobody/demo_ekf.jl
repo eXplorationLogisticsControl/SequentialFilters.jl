@@ -7,7 +7,7 @@ time, and allocations for the EKF and the square-root EKF on this scenario.
 
 
 import Pkg
-Pkg.activate(@__DIR__)
+Pkg.activate(joinpath(@__DIR__, ".."))
 
 using CairoMakie
 using ForwardDiff
@@ -181,7 +181,8 @@ Legend(
     framevisible = false,
 )
 
-outfile = joinpath(@__DIR__, "twobody_ekf_errors.png")
+outfile = joinpath(@__DIR__, "plots", "twobody_ekf_errors.png")
+mkpath(dirname(outfile))
 save(outfile, fig)
 println("saved $(outfile)")
 x_true = truth(n_meas * Δt)
@@ -189,5 +190,5 @@ println("final position error $(norm(ekf.x[1:3] .- x_true[1:3])) km")
 println("final velocity error $(norm(ekf.x[4:6] .- x_true[4:6])) km/s")
 
 include(joinpath(@__DIR__, "twobody_scenario.jl"))
-include(joinpath(@__DIR__, "benchmark_filters.jl"))
+include(joinpath(@__DIR__, "..", "benchmark_filters.jl"))
 print_filter_costs(load_twobody_case(), :ekf)

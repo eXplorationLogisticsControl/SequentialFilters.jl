@@ -1,12 +1,12 @@
 """
-Demo with two-body dynamics using the square-root unscented Kalman filter.
+Demo with two-body dynamics using the square-root conjugate unscented Kalman filter.
 
 The script saves the error figure and then prints elapsed time, process CPU
 time, and allocations for this scenario.
 """
 
 import Pkg
-Pkg.activate(@__DIR__)
+Pkg.activate(joinpath(@__DIR__, ".."))
 
 using CairoMakie
 using LinearAlgebra
@@ -93,7 +93,7 @@ end
 x_hat0 = x0 .+ [1.0, -0.5, 0.8, 1.0e-3, -0.5e-3, 0.7e-3]
 P0 = Matrix(Diagonal([fill(σ_r^2, 3); fill(σ_v^2, 3)]))
 
-filt = SquareRootUnscentedKalmanFilter(0.0, x_hat0, P0)
+filt = SquareRootConjugateUnscentedKalmanFilter(0.0, x_hat0, P0; order = 4)
 dynamics = NonlinearODEModel(twobody!; n = n, p = μ)
 process_noise_model = UnbiasedRandomProcess(1.0e-6)
 
@@ -149,7 +149,7 @@ labels = [
     "δvz (km/s)",
 ]
 fig = Figure(size = (1000, 640))
-Label(fig[0, 1:3], "Two-body square-root UKF estimation error"; fontsize = 16)
+Label(fig[0, 1:3], "Two-body square-root CUT4 estimation error"; fontsize = 16)
 axes = Matrix{Axis}(undef, 2, 3)
 for i in 1:6
     row, col = fldmod1(i, 3)
@@ -173,7 +173,8 @@ Legend(
     framevisible = false,
 )
 
-outfile = joinpath(@__DIR__, "twobody_srukf_errors.png")
+outfile = joinpath(@__DIR__, "plots", "twobody_srcut_errors.png")
+mkpath(dirname(outfile))
 save(outfile, fig)
 println("saved $(outfile)")
 x_true = truth(n_meas * Δt)
@@ -181,5 +182,5 @@ println("final position error $(norm(filt.x[1:3] .- x_true[1:3])) km")
 println("final velocity error $(norm(filt.x[4:6] .- x_true[4:6])) km/s")
 
 include(joinpath(@__DIR__, "twobody_scenario.jl"))
-include(joinpath(@__DIR__, "benchmark_filters.jl"))
-print_filter_costs(load_twobody_case(), :ukf)
+include(joinpath(@__DIR__, "..", "benchmark_filters.jl"))
+print_filter_costs(load_twobody_case(), :cut)

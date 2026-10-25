@@ -1,15 +1,15 @@
 """
-Lorenz-63 demo using the bootstrap particle filter.
+Lorenz-63 demo using the extended Kalman filter.
 
-The vector field, step, noise, and measurements live in `demo/lorenz63.jl`.
+The vector field, step, noise, and measurements live in `demo/lorenz/lorenz63.jl`.
 The script saves the error figure and then prints elapsed time, process CPU
 time, and allocations for this scenario.
 
-    julia --project=demo demo/demo_lorenz_particle.jl
+    julia --project=demo demo/lorenz/demo_ekf.jl
 """
 
 import Pkg
-Pkg.activate(@__DIR__)
+Pkg.activate(joinpath(@__DIR__, ".."))
 
 using CairoMakie
 using LinearAlgebra
@@ -22,7 +22,7 @@ import SequentialFilters: predict!, update!
 
 include(joinpath(@__DIR__, "lorenz63.jl"))
 
-case = load_lorenz_case(n_particles = 400)
+case = load_lorenz_case()
 Δt = case.Δt
 n_steps = case.n_steps
 n_save = 9
@@ -38,10 +38,9 @@ measurements = case.measurements
 println("Lorenz-63: σ = 10, ρ = 28, β = 8/3, Δt = $(Δt), steps = $(n_steps)")
 println("x0 = $(case.x0) is off the attractor; nonzero equilibria are near (±8.49, ±8.49, 27)")
 println("measurement is (x, z) with σ = $(case.σ_meas), seed 1; additive process noise Q = 1e-3 I")
-println("particle count = $(case.n_particles), resampling = :systematic, rng = MersenneTwister(1)")
 
 
-filt = ParticleFilter(0.0, case.x_hat0, case.P0; n_particles = case.n_particles, rng = MersenneTwister(1))
+filt = ExtendedKalmanFilter(0.0, case.x_hat0, case.P0)
 
 """Covariance `Φ P_start Φᵀ` stored in an augmented state `[x; vec(Φ)]`."""
 function propagated_covariance(u, P_start, n)
@@ -89,7 +88,7 @@ sig = reduce(hcat, sig_hist)'
 
 labels = ["δx", "δy", "δz"]
 fig = Figure(size = (1000, 380))
-Label(fig[0, 1:3], "Lorenz-63 particle filter estimation error"; fontsize = 16)
+Label(fig[0, 1:3], "Lorenz-63 EKF estimation error"; fontsize = 16)
 axes = Matrix{Axis}(undef, 1, 3)
 for i in 1:3
     axes[1, i] = Axis(fig[1, i]; ylabel = labels[i], xlabel = "time")
@@ -107,11 +106,12 @@ Legend(
     framevisible = false,
 )
 
-outfile = joinpath(@__DIR__, "lorenz_particle_errors.png")
+outfile = joinpath(@__DIR__, "plots", "lorenz_ekf_errors.png")
+mkpath(dirname(outfile))
 save(outfile, fig)
 println("saved $(outfile)")
 report_lorenz_errors(post_errors)
 
-include(joinpath(@__DIR__, "benchmark_filters.jl"))
+include(joinpath(@__DIR__, "..", "benchmark_filters.jl"))
 include(joinpath(@__DIR__, "lorenz_benchmark.jl"))
-print_lorenz_costs(case, :particle)
+print_lorenz_costs(case, :ekf)

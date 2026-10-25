@@ -6,7 +6,7 @@ time, and allocations for this scenario.
 """
 
 import Pkg
-Pkg.activate(@__DIR__)
+Pkg.activate(joinpath(@__DIR__, ".."))
 
 using CairoMakie
 using LinearAlgebra
@@ -173,7 +173,8 @@ Legend(
     framevisible = false,
 )
 
-outfile = joinpath(@__DIR__, "twobody_cut_errors.png")
+outfile = joinpath(@__DIR__, "plots", "twobody_cut_errors.png")
+mkpath(dirname(outfile))
 save(outfile, fig)
 println("saved $(outfile)")
 x_true = truth(n_meas * Δt)
@@ -181,5 +182,5 @@ println("final position error $(norm(filt.x[1:3] .- x_true[1:3])) km")
 println("final velocity error $(norm(filt.x[4:6] .- x_true[4:6])) km/s")
 
 include(joinpath(@__DIR__, "twobody_scenario.jl"))
-include(joinpath(@__DIR__, "benchmark_filters.jl"))
+include(joinpath(@__DIR__, "..", "benchmark_filters.jl"))
 print_filter_costs(load_twobody_case(), :cut)

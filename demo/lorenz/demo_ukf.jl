@@ -1,15 +1,15 @@
 """
 Lorenz-63 demo using the unscented Kalman filter.
 
-The vector field, step, noise, and measurements live in `demo/lorenz63.jl`.
+The vector field, step, noise, and measurements live in `demo/lorenz/lorenz63.jl`.
 The script saves the error figure and then prints elapsed time, process CPU
 time, and allocations for this scenario.
 
-    julia --project=demo demo/demo_lorenz_ukf.jl
+    julia --project=demo demo/lorenz/demo_ukf.jl
 """
 
 import Pkg
-Pkg.activate(@__DIR__)
+Pkg.activate(joinpath(@__DIR__, ".."))
 
 using CairoMakie
 using LinearAlgebra
@@ -105,11 +105,12 @@ Legend(
     framevisible = false,
 )
 
-outfile = joinpath(@__DIR__, "lorenz_ukf_errors.png")
+outfile = joinpath(@__DIR__, "plots", "lorenz_ukf_errors.png")
+mkpath(dirname(outfile))
 save(outfile, fig)
 println("saved $(outfile)")
 report_lorenz_errors(post_errors)
 
-include(joinpath(@__DIR__, "benchmark_filters.jl"))
+include(joinpath(@__DIR__, "..", "benchmark_filters.jl"))
 include(joinpath(@__DIR__, "lorenz_benchmark.jl"))
 print_lorenz_costs(case, :ukf)

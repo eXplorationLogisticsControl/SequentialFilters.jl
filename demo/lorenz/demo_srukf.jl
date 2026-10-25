@@ -1,15 +1,15 @@
 """
-Lorenz-63 demo using the square-root extended Kalman filter.
+Lorenz-63 demo using the square-root unscented Kalman filter.
 
-The vector field, step, noise, and measurements live in `demo/lorenz63.jl`.
+The vector field, step, noise, and measurements live in `demo/lorenz/lorenz63.jl`.
 The script saves the error figure and then prints elapsed time, process CPU
 time, and allocations for this scenario.
 
-    julia --project=demo demo/demo_lorenz_srekf.jl
+    julia --project=demo demo/lorenz/demo_srukf.jl
 """
 
 import Pkg
-Pkg.activate(@__DIR__)
+Pkg.activate(joinpath(@__DIR__, ".."))
 
 using CairoMakie
 using LinearAlgebra
@@ -32,7 +32,6 @@ ys = case.ys
 R = case.R
 dynamics = case.dynamics
 process_noise_model = case.process_noise
-measurements = case.measurements
 
 
 println("Lorenz-63: σ = 10, ρ = 28, β = 8/3, Δt = $(Δt), steps = $(n_steps)")
@@ -40,7 +39,7 @@ println("x0 = $(case.x0) is off the attractor; nonzero equilibria are near (±8.
 println("measurement is (x, z) with σ = $(case.σ_meas), seed 1; additive process noise Q = 1e-3 I")
 
 
-filt = SquareRootExtendedKalmanFilter(0.0, case.x_hat0, case.P0)
+filt = SquareRootUnscentedKalmanFilter(0.0, case.x_hat0, case.P0)
 
 """Covariance `Φ P_start Φᵀ` stored in an augmented state `[x; vec(Φ)]`."""
 function propagated_covariance(u, P_start, n)
@@ -78,7 +77,7 @@ for k in 1:n_steps
         record!(t, sol.u[i][1:n], propagated_covariance(sol.u[i], P_start, n))
     end
     record!(filt.t, filt.x, covariance(filt))
-    update!(filt, measurements, ys[k], R)
+    update!(filt, case.h, ys[k], R)
     record!(filt.t, filt.x, covariance(filt))
     push!(post_errors, err_hist[end])
 end
@@ -88,7 +87,7 @@ sig = reduce(hcat, sig_hist)'
 
 labels = ["δx", "δy", "δz"]
 fig = Figure(size = (1000, 380))
-Label(fig[0, 1:3], "Lorenz-63 square-root EKF estimation error"; fontsize = 16)
+Label(fig[0, 1:3], "Lorenz-63 square-root UKF estimation error"; fontsize = 16)
 axes = Matrix{Axis}(undef, 1, 3)
 for i in 1:3
     axes[1, i] = Axis(fig[1, i]; ylabel = labels[i], xlabel = "time")
@@ -106,11 +105,12 @@ Legend(
     framevisible = false,
 )
 
-outfile = joinpath(@__DIR__, "lorenz_srekf_errors.png")
+outfile = joinpath(@__DIR__, "plots", "lorenz_srukf_errors.png")
+mkpath(dirname(outfile))
 save(outfile, fig)
 println("saved $(outfile)")
 report_lorenz_errors(post_errors)
 
-include(joinpath(@__DIR__, "benchmark_filters.jl"))
+include(joinpath(@__DIR__, "..", "benchmark_filters.jl"))
 include(joinpath(@__DIR__, "lorenz_benchmark.jl"))
-print_lorenz_costs(case, :ekf)
+print_lorenz_costs(case, :ukf)

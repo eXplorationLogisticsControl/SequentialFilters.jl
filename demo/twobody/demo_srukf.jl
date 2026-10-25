@@ -1,15 +1,14 @@
 """
-Demo with two-body dynamics using the square-root extended Kalman filter.
+Demo with two-body dynamics using the square-root unscented Kalman filter.
 
 The script saves the error figure and then prints elapsed time, process CPU
 time, and allocations for this scenario.
 """
 
 import Pkg
-Pkg.activate(@__DIR__)
+Pkg.activate(joinpath(@__DIR__, ".."))
 
 using CairoMakie
-using ForwardDiff
 using LinearAlgebra
 using OrdinaryDiffEq
 using Random
@@ -94,15 +93,9 @@ end
 x_hat0 = x0 .+ [1.0, -0.5, 0.8, 1.0e-3, -0.5e-3, 0.7e-3]
 P0 = Matrix(Diagonal([fill(σ_r^2, 3); fill(σ_v^2, 3)]))
 
-filt = SquareRootExtendedKalmanFilter(0.0, x_hat0, P0)
+filt = SquareRootUnscentedKalmanFilter(0.0, x_hat0, P0)
 dynamics = NonlinearODEModel(twobody!; n = n, p = μ)
 process_noise_model = UnbiasedRandomProcess(1.0e-6)
-function get_h_H(t, x)
-    yhat = range_rangerate(t, x)
-    H = ForwardDiff.jacobian(z -> range_rangerate(t, z), x)
-    return yhat, H
-end
-measurements = NonlinearMeasurementModel(get_h_H)
 
 """Covariance `Φ P_start Φᵀ` stored in an augmented state `[x; vec(Φ)]`."""
 function propagated_covariance(u, P_start, n)
@@ -139,7 +132,7 @@ for k in 1:n_meas
         record!(t, sol.u[i][1:n], propagated_covariance(sol.u[i], P_start, n))
     end
     record!(filt.t, filt.x, covariance(filt))
-    update!(filt, measurements, ys[k], R)
+    update!(filt, range_rangerate, ys[k], R)
     record!(filt.t, filt.x, covariance(filt))
 end
 
@@ -156,7 +149,7 @@ labels = [
     "δvz (km/s)",
 ]
 fig = Figure(size = (1000, 640))
-Label(fig[0, 1:3], "Two-body square-root EKF estimation error"; fontsize = 16)
+Label(fig[0, 1:3], "Two-body square-root UKF estimation error"; fontsize = 16)
 axes = Matrix{Axis}(undef, 2, 3)
 for i in 1:6
     row, col = fldmod1(i, 3)
@@ -180,7 +173,8 @@ Legend(
     framevisible = false,
 )
 
-outfile = joinpath(@__DIR__, "twobody_srekf_errors.png")
+outfile = joinpath(@__DIR__, "plots", "twobody_srukf_errors.png")
+mkpath(dirname(outfile))
 save(outfile, fig)
 println("saved $(outfile)")
 x_true = truth(n_meas * Δt)
@@ -188,5 +182,5 @@ println("final position error $(norm(filt.x[1:3] .- x_true[1:3])) km")
 println("final velocity error $(norm(filt.x[4:6] .- x_true[4:6])) km/s")
 
 include(joinpath(@__DIR__, "twobody_scenario.jl"))
-include(joinpath(@__DIR__, "benchmark_filters.jl"))
-print_filter_costs(load_twobody_case(), :ekf)
+include(joinpath(@__DIR__, "..", "benchmark_filters.jl"))
+print_filter_costs(load_twobody_case(), :ukf)
