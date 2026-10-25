@@ -97,10 +97,14 @@ filt = SquareRootUnscentedKalmanFilter(0.0, x_hat0, P0)
 dynamics = NonlinearODEModel(twobody!; n = n, p = μ)
 process_noise_model = UnbiasedRandomProcess(1.0e-6)
 
-"""Covariance `Φ P_start Φᵀ` stored in an augmented state `[x; vec(Φ)]`."""
-function propagated_covariance(u, P_start, n)
+"""Covariance `Φ P_start Φᵀ + Q(Δt_elapsed)` stored in an augmented state `[x; vec(Φ)]`.
+
+`Q` is `get_noise(process_noise_model, Δt_elapsed)` from the start of this predict step.
+"""
+function propagated_covariance(u, P_start, n, process_noise_model, Δt_elapsed)
     Φ = reshape(@view(u[(n + 1):end]), n, n)
-    mapped = Φ * P_start * Φ'
+    Q = get_noise(process_noise_model, Float64(Δt_elapsed))
+    mapped = Φ * P_start * Φ' + Q
     return (mapped + mapped') ./ 2
 end
 
@@ -129,7 +133,7 @@ for k in 1:n_meas
     for i in eachindex(sol.t)
         t = sol.t[i]
         (t ≈ t0 || t ≈ t0 + Δt) && continue
-        record!(t, sol.u[i][1:n], propagated_covariance(sol.u[i], P_start, n))
+        record!(t, sol.u[i][1:n], propagated_covariance(sol.u[i], P_start, n, process_noise_model, t - t0))
     end
     record!(filt.t, filt.x, covariance(filt))
     update!(filt, range_rangerate, ys[k], R)

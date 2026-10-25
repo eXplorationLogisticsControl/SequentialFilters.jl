@@ -41,10 +41,14 @@ println("measurement is (x, z) with σ = $(case.σ_meas), seed 1; additive proce
 
 filt = UnscentedKalmanFilter(0.0, case.x_hat0, case.P0)
 
-"""Covariance `Φ P_start Φᵀ` stored in an augmented state `[x; vec(Φ)]`."""
-function propagated_covariance(u, P_start, n)
+"""Covariance `Φ P_start Φᵀ + Q(Δt_elapsed)` stored in an augmented state `[x; vec(Φ)]`.
+
+`Q` is `get_noise(process_noise_model, Δt_elapsed)` from the start of this predict step.
+"""
+function propagated_covariance(u, P_start, n, process_noise_model, Δt_elapsed)
     Φ = reshape(@view(u[(n + 1):end]), n, n)
-    mapped = Φ * P_start * Φ'
+    Q = get_noise(process_noise_model, Float64(Δt_elapsed))
+    mapped = Φ * P_start * Φ' + Q
     return (mapped + mapped') ./ 2
 end
 
@@ -74,7 +78,7 @@ for k in 1:n_steps
     for i in eachindex(sol.t)
         t = sol.t[i]
         (t ≈ t0 || t ≈ t0 + Δt) && continue
-        record!(t, sol.u[i][1:n], propagated_covariance(sol.u[i], P_start, n))
+        record!(t, sol.u[i][1:n], propagated_covariance(sol.u[i], P_start, n, process_noise_model, t - t0))
     end
     record!(filt.t, filt.x, filt.P)
     update!(filt, case.h, ys[k], R)
