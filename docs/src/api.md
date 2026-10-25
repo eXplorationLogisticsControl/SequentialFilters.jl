@@ -47,3 +47,21 @@ covariance
 predict!
 update!
 ```
+
+## Diagnosis
+
+```@docs
+estimation_error
+rmse
+block_rmse
+time_averaged_rmse
+nees
+averaged_nees
+nis
+averaged_nis
+innovation_autocorrelation
+whiteness_bound
+is_diverged
+divergence_rate
+mahalanobis
+```
