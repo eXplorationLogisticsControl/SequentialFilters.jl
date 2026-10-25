@@ -101,7 +101,7 @@ P_{k:k}
 
 ## Two-body demo
 
-`demo/twobody/demo_ukf.jl` uses the dynamics, initial mean and covariance, range and range-rate measurements, and noise from the EKF demo. Each sigma point is one trajectory of a [`NonlinearODEModel`](@ref). The figure samples the returned `ODESolution` between measurements and draws the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``, using ``\Phi P_{\mathrm{start}} \Phi^\top`` from that solution. The endpoint covariance includes ``Q``.
+`demo/twobody/demo_ukf.jl` uses the dynamics, initial mean and covariance, range and range-rate measurements, and noise from the EKF demo. Each sigma point is one trajectory of a [`NonlinearODEModel`](@ref). The figure samples the returned `ODESolution` between measurements and draws the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``. Between measurements, ``P(t) = \Phi(t) P_{\mathrm{start}} \Phi(t)^\top + Q(t - t_0)``, where ``Q(\tau)`` is `get_noise(process_noise_model, τ)`. The samples at the measurement times use the filter covariance, which includes ``Q(\Delta t)``.
 
 ```julia
 using SequentialFilters
