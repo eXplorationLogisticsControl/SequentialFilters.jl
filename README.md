@@ -14,19 +14,3 @@
 
 Sequential filters for nonlinear state estimation: an extended Kalman filter, a scaled unscented Kalman filter, and square-root forms of both.
 
-Tutorials for each filter are in the [documentation](https://explorationlogisticscontrol.github.io/SequentialFilters.jl). Build it locally with
-
-```bash
-julia --project=docs -e 'using Pkg; Pkg.instantiate()'
-julia --project=docs docs/make.jl
-```
-
-The two-body demos print elapsed time, process CPU time, and allocations for each covariance-form filter and its square-root form:
-
-```bash
-julia --project=demo demo/demo_twobody_ekf.jl
-julia --project=demo demo/demo_ukf.jl
-julia --project=demo demo/demo_srekf.jl
-julia --project=demo demo/demo_srukf.jl
-julia --project=demo demo/demo_srcut.jl
-```
