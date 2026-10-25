@@ -16,7 +16,7 @@ Sequential filters for nonlinear state estimation: an extended Kalman filter, a 
 
 ### TODO
 
-- [ ] Higher-order unscented Kalman estimators (HOUSE) variants
+- [x] Higher-order unscented Kalman estimators (HOUSE) variants
 - [x] Particle filters (parallelization via `EnsembleProblem`)
 - [ ] Gaussian mixture filters
 - [ ] Filters with consider parameters
