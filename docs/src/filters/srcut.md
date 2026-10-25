@@ -12,16 +12,17 @@ Sigma points and weights come from [`cut_points`](@ref). The default `order` is 
 
 ## Motivation
 
-The [covariance-form CUT](@ref cut-tutorial) matches higher Gaussian moments than the UKF, then stores ``P`` and adds the weighted outer products directly. That is the same numerical exposure as the covariance-form UKF: after enough steps, or when a weight is negative, the reconstructed ``P`` can lose definiteness, and the next predict has to factor it again. The square-root CUT keeps a factor ``S`` and applies the van der Merwe / Wan QR-and-downdate arithmetic to the CUT weights.
+The [covariance-form CUT](@ref cut-tutorial) matches higher Gaussian moments than the UKF, then stores ``P`` and adds the weighted outer products directly. That is the same numerical exposure as the covariance-form UKF: after enough steps, or when a weight is negative, the reconstructed ``P`` can lose definiteness, and the next predict has to factor it again. The square-root CUT keeps a factor ``S``. Predict and the innovation factor apply the van der Merwe / Wan QR-and-downdate to the CUT weights; the posterior is the Joseph QR.
 
-Use it when you want CUT moment matching and a stored factor that stays positive definite. CUT4 and CUT6 weights on the supported dimensions are nonnegative, so a predict is usually only the QR; the measurement update still downdates ``S_{k:k-1}`` by the columns of ``K S_{y,k:k-1}``. There is no separate "square-root CUT" paper: the cubature is Adurthi, Singla, and Singh, and the factor arithmetic is the square-root UKF applied to those weights.
+Use it when you want CUT moment matching and a stored factor that stays positive definite. CUT4 and CUT6 weights on the supported dimensions are nonnegative, so a predict is usually only the QR. There is no separate "square-root CUT" paper: the cubature is Adurthi, Singla, and Singh. The predict and the innovation factor use the van der Merwe / Wan QR-and-downdate. The posterior is the Joseph QR of the [square-root UKF](@ref srukf-tutorial).
 
 **Further reading.**
 
 - Adurthi, N., Singla, P., and Singh, T. (2018). [Conjugate Unscented Transformation: Applications to Estimation and Control](https://doi.org/10.1115/1.4037783). *ASME Journal of Dynamic Systems, Measurement, and Control*, 140(3), 030907.
 - van der Merwe, R., and Wan, E. A. (2001). [The Square-Root Unscented Kalman Filter for State and Parameter-Estimation](https://doi.org/10.1109/ICASSP.2001.940586). *Proc. IEEE ICASSP*, 3461–3464.
+- Zanetti, R., and DeMars, K. J. (2013). [Joseph Formulation of Unscented and Quadrature Filters with Application to Consider States](https://doi.org/10.2514/1.59935). *Journal of Guidance, Control, and Dynamics*, 36(6), 1860–1863.
 
-The CUT orders and the QR / downdate steps are those of the [CUT](@ref cut-tutorial) and [square-root UKF](@ref srukf-tutorial) tutorials.
+The CUT orders are those of the [CUT](@ref cut-tutorial) tutorial. The predict QR is written below. The measurement update is the Joseph QR of the [square-root UKF](@ref srukf-tutorial).
 
 ## Prediction
 
@@ -84,21 +85,52 @@ K = P_{xy,k:k-1}
     \bigl(S_{y,k:k-1} S_{y,k:k-1}^\top\bigr)^{-1}.
 ```
 
-With ``U = K S_{y,k:k-1}``, the posterior factor downdates one column of `U` at a time,
+The posterior factor is the Joseph form, the same thin QR as the [square-root UKF](@ref srukf-tutorial), with the cross-covariance in place of ``H S``. Define
+
+```math
+C = \bigl(S_{k:k-1}^{-1} P_{xy,k:k-1}\bigr)^\top,
+```
+
+so ``S_{k:k-1} C^\top = P_{xy,k:k-1}``. Let ``S_r`` be a factor of the residual measurement covariance,
+
+```math
+S_r S_r^\top = S_{y,k:k-1} S_{y,k:k-1}^\top - C C^\top.
+```
+
+For a linear measurement, ``C = H S_{k:k-1}`` and that residual is ``R``. The stacked matrix
+
+```math
+\begin{bmatrix}
+\bigl(S_{k:k-1} - K C\bigr)^\top \\
+(K S_r)^\top
+\end{bmatrix}
+```
+
+has thin QR equal to a lower factor ``S_{k:k}`` with a positive diagonal, so
 
 ```math
 S_{k:k} S_{k:k}^\top
-  = S_{k:k-1} S_{k:k-1}^\top
-    - \sum_{j=1}^{n_y} U_{:,j} U_{:,j}^\top,
+  = \bigl(S_{k:k-1} - K C\bigr)\bigl(S_{k:k-1} - K C\bigr)^\top
+    + K S_r S_r^\top K^\top,
 ```
 
-and
+which is the Zanetti–DeMars formula
+
+```math
+P_{k:k}
+  = P_{k:k-1}
+  - P_{xy,k:k-1} K^\top
+  - K P_{xy,k:k-1}^\top
+  + K S_{y,k:k-1} S_{y,k:k-1}^\top K^\top.
+```
+
+The mean update is unchanged,
 
 ```math
 x_{k:k} = x_{k:k-1} + K\bigl(y_{k} - \hat y_{k:k-1}\bigr).
 ```
 
-That is the additive update ``P_{k:k} = P_{k:k-1} - K S_{y,k:k-1} S_{y,k:k-1}^\top K^\top``.
+For the optimal gain this matches ``P_{k:k-1} - K S_{y,k:k-1} S_{y,k:k-1}^\top K^\top`` in exact arithmetic. The Joseph QR stays valid when ``K`` is not that gain.
 
 ## Two-body demo
 

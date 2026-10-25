@@ -8,20 +8,21 @@ P = S S^\top.
 
 Weights and ``\lambda`` are [`unscented_weights`](@ref), the same scaled convention as [`UnscentedKalmanFilter`](@ref). Defaults are `alpha = 1e-3`, `beta = 2`, and `kappa = 0`. Sigma points are columns of `S` scaled by ``\sqrt{n+\lambda}``. No Jacobians are required.
 
-With the defaults, the center covariance weight is negative. The time and measurement updates put the positive weights into a thin QR, then apply a Cholesky rank-one downdate for that negative weight. The two-body demo is `demo/demo_srukf.jl`.
+With the defaults, the center covariance weight is negative. The time update and the innovation factor put the positive weights into a thin QR, then apply a Cholesky rank-one downdate for that negative weight. The posterior factor is the Joseph QR in the update section. The two-body demo is `demo/demo_srukf.jl`.
 
 ## Motivation
 
 The [UKF](@ref ukf-tutorial) already spends a Cholesky of ``P`` to form sigma points, then rebuilds ``P`` from a weighted outer-product sum. The default center covariance weight is negative, so that sum is not a Gram matrix: forming ``P`` and factoring it again is both wasteful and a place for roundoff to destroy definiteness. The square-root UKF keeps ``S``, draws sigma points from its columns, puts the positive-weight deviations into a thin QR with a process-noise factor, and applies a Cholesky rank-one downdate for the negative center weight.
 
-Use it whenever you would use the UKF and want the stored uncertainty to remain a valid factor. The mean, scaled weights, and additive-noise model are those of [`UnscentedKalmanFilter`](@ref). The extra cost relative to the covariance form is the QR and the downdate; the two-body pair still propagates the same ``2n+1`` points.
+Use it whenever you would use the UKF and want the stored uncertainty to remain a valid factor. The mean, scaled weights, and additive-noise model are those of [`UnscentedKalmanFilter`](@ref). The extra cost relative to the covariance form is the QR, the negative-weight downdate, and the Joseph posterior QR; the two-body pair still propagates the same ``2n+1`` points.
 
 **Further reading.**
 
 - van der Merwe, R., and Wan, E. A. (2001). [The Square-Root Unscented Kalman Filter for State and Parameter-Estimation](https://doi.org/10.1109/ICASSP.2001.940586). *Proc. IEEE International Conference on Acoustics, Speech, and Signal Processing*, 3461–3464.
 - van der Merwe, R. (2004). *Sigma-Point Kalman Filters for Probabilistic Inference in Dynamic State-Space Models*. PhD dissertation, OGI School of Science & Engineering, Oregon Health & Science University.
+- Zanetti, R., and DeMars, K. J. (2013). [Joseph Formulation of Unscented and Quadrature Filters with Application to Consider States](https://doi.org/10.2514/1.59935). *Journal of Guidance, Control, and Dynamics*, 36(6), 1860–1863.
 
-The scaled weights are those of Wan and van der Merwe (2000), cited on the [UKF page](@ref ukf-tutorial).
+The scaled weights and the time update are those of Wan and van der Merwe, cited on the [UKF page](@ref ukf-tutorial). The measurement update uses the Joseph formula of Zanetti and DeMars.
 
 ## Prediction
 
@@ -94,21 +95,52 @@ K = P_{xy,k:k-1}
     \bigl(S_{y,k:k-1} S_{y,k:k-1}^\top\bigr)^{-1}.
 ```
 
-With ``U = K S_{y,k:k-1}``, the posterior factor downdates one column of `U` at a time:
+The posterior factor is the Joseph form, the same thin QR as the [Square-root EKF (SREKF)](@ref srekf-tutorial), with the cross-covariance in place of ``H S``. Define
+
+```math
+C = \bigl(S_{k:k-1}^{-1} P_{xy,k:k-1}\bigr)^\top,
+```
+
+so ``S_{k:k-1} C^\top = P_{xy,k:k-1}``. Let ``S_r`` be a factor of the residual measurement covariance,
+
+```math
+S_r S_r^\top = S_{y,k:k-1} S_{y,k:k-1}^\top - C C^\top.
+```
+
+For a linear measurement, ``C = H S_{k:k-1}`` and that residual is ``R``. The stacked matrix
+
+```math
+\begin{bmatrix}
+\bigl(S_{k:k-1} - K C\bigr)^\top \\
+(K S_r)^\top
+\end{bmatrix}
+```
+
+has thin QR equal to a lower factor ``S_{k:k}`` with a positive diagonal, so
 
 ```math
 S_{k:k} S_{k:k}^\top
-  = S_{k:k-1} S_{k:k-1}^\top
-    - \sum_{j=1}^{n_y} U_{:,j} U_{:,j}^\top,
+  = \bigl(S_{k:k-1} - K C\bigr)\bigl(S_{k:k-1} - K C\bigr)^\top
+    + K S_r S_r^\top K^\top,
 ```
 
-and
+which is the Zanetti–DeMars formula
+
+```math
+P_{k:k}
+  = P_{k:k-1}
+  - P_{xy,k:k-1} K^\top
+  - K P_{xy,k:k-1}^\top
+  + K S_{y,k:k-1} S_{y,k:k-1}^\top K^\top.
+```
+
+The mean update is unchanged,
 
 ```math
 x_{k:k} = x_{k:k-1} + K\bigl(y_{k} - \hat y_{k:k-1}\bigr).
 ```
 
-This is ``P_{k:k} = P_{k:k-1} - K S_{y,k:k-1} S_{y,k:k-1}^\top K^\top``, the additive square-root measurement update.
+For the optimal gain this matches ``P_{k:k-1} - K S_{y,k:k-1} S_{y,k:k-1}^\top K^\top`` in exact arithmetic. The Joseph QR stays valid when ``K`` is not that gain.
 
 ## Two-body demo
 

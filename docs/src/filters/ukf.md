@@ -16,6 +16,7 @@ Use the UKF when derivatives are unavailable, expensive, or a poor description o
 - Julier, S. J., Uhlmann, J. K., and Durrant-Whyte, H. F. (2000). [A New Method for the Nonlinear Transformation of Means and Covariances in Filters and Estimators](https://doi.org/10.1109/9.847726). *IEEE Transactions on Automatic Control*, 45(3), 477–482.
 - Wan, E. A., and van der Merwe, R. (2000). [The Unscented Kalman Filter for Nonlinear Estimation](https://doi.org/10.1109/ASSPCC.2000.882463). *Proc. IEEE Adaptive Systems for Signal Processing, Communications, and Control Symposium*, 153–158.
 - Julier, S. J., and Uhlmann, J. K. (2004). [Unscented Filtering and Nonlinear Estimation](https://doi.org/10.1109/JPROC.2003.823141). *Proceedings of the IEEE*, 92(3), 401–422.
+- Zanetti, R., and DeMars, K. J. (2013). [Joseph Formulation of Unscented and Quadrature Filters with Application to Consider States](https://doi.org/10.2514/1.59935). *Journal of Guidance, Control, and Dynamics*, 36(6), 1860–1863.
 
 ## Prediction
 
@@ -87,10 +88,14 @@ x_{k:k} = x_{k:k-1} + K\bigl(y_{k} - \hat y_{k:k-1}\bigr),
 ```
 
 ```math
-P_{k:k} = P_{k:k-1} - K S_{y,k:k-1} K^\top.
+P_{k:k}
+  = P_{k:k-1}
+  - P_{xy,k:k-1} K^\top
+  - K P_{xy,k:k-1}^\top
+  + K S_{y,k:k-1} K^\top.
 ```
 
-``P_{k:k}`` is symmetrized. This is the additive-noise form, not a joint augmented state.
+``P_{k:k}`` is symmetrized. This is the additive-noise form, not a joint augmented state. The posterior is the Joseph formula of Zanetti and DeMars rather than ``P_{k:k-1} - K S_{y,k:k-1} K^\top``. As on the [EKF](@ref ekf-tutorial) page, that form stays symmetric and is less sensitive to roundoff in ``K``. It remains valid when the gain is not the optimal ``P_{xy} S_y^{-1}``. For the optimal gain the two formulas agree in exact arithmetic. No measurement Jacobian is required: ``P_{xy}`` takes the place of ``P H^\top``.
 
 ## Two-body demo
 
