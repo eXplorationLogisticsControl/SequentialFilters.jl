@@ -1,7 +1,7 @@
 """
 Monte Carlo comparison of every SequentialFilters filter on the two-body scenario.
 
-    julia --project=experiments experiments/run_twobody.jl
+    julia --project=experiments/square-root-benchmark experiments/square-root-benchmark/run_twobody.jl
 
 Optional arguments: `--M`, `--sweep-M`, `--seed`, and `--skip-sweep`.
 The measurement-noise sweep uses seed + 1. A non-positive `--sweep-M` skips it.

@@ -8,7 +8,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SequentialFilters = "f2989da4-8834-438a-a567-aef86a75e79e"
 
 [sources]
-SequentialFilters = {path = ".."}
+SequentialFilters = {path = "../.."}
 
 [compat]
 CairoMakie = "0.15"

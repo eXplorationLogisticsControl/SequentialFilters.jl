@@ -1,12 +1,12 @@
 """
 Square-root CUT benchmarks: ill-conditioned tracking and long-arc angles-only OD.
 
-    julia --project=experiments experiments/run_srcut_benchmarks.jl
+    julia --project=experiments/square-root-benchmark experiments/square-root-benchmark/run_srcut_benchmarks.jl
 
 Optional arguments: `--M`, `--seed`, `--illcond-only`, `--longarc-only`.
 Default Monte Carlo size is 200. The same draws are reused by every filter in
 a setting. Float32 and Float64 share those draws. Output tables and the
-working figures go to `experiments/output/srcut/`, which is not committed.
+working figures go to `experiments/square-root-benchmark/output/srcut/`, which is not committed.
 The six main PNGs are copied to the project media directory.
 """
 
