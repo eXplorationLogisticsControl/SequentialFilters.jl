@@ -100,13 +100,6 @@ function rmse(errors::AbstractArray{<:Real,3})
     return [rmse(@view errors[:, :, k]) for k in 1:size(errors, 3)]
 end
 
-"""
-    block_rmse(errors, indices)
-    block_rmse(errors, blocks::NamedTuple)
-
-RMSE on a state block. `indices` selects rows. A named tuple such as
-`(position=1:3, velocity=4:6)` returns a named tuple of block RMSEs.
-"""
 function _block_view(errors::AbstractMatrix, indices)
     return view(errors, _state_index(indices), :)
 end
@@ -115,6 +108,13 @@ function _block_view(errors::AbstractArray{<:Real,3}, indices)
     return view(errors, _state_index(indices), :, :)
 end
 
+"""
+    block_rmse(errors, indices)
+    block_rmse(errors, blocks::NamedTuple)
+
+RMSE on a state block. `indices` selects rows. A named tuple such as
+`(position=1:3, velocity=4:6)` returns a named tuple of block RMSEs.
+"""
 function block_rmse(errors::AbstractArray{<:Real}, indices)
     return rmse(_block_view(errors, indices))
 end

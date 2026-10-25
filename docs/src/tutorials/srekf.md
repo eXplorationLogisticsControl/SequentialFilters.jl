@@ -10,62 +10,83 @@ The constructor factors `P` once. Later predict and update steps rebuild `S` wit
 
 `f` and `h` are nonlinear. Their Jacobians are an `nx × nx` or `ny × nx` matrix, or a function of `(t, x, Δt)` and `(t, x)` respectively. Process and measurement noise are additive. The two-body demo is `demo/demo_srekf.jl`. There `F` is the state-transition matrix from the same propagation the EKF uses.
 
+## Motivation
+
+The [EKF](@ref ekf-tutorial) stores ``P`` and applies rank-two updates (``P_{k:k-1} = F P_{k-1:k-1} F^\top + Q``, Joseph). In finite precision those products can lose symmetry and, after enough steps or when ``R`` is small, positive-definiteness. A square-root filter stores a factor ``S`` with ``P = SS^\top``, so the reconstructed covariance cannot become indefinite. Predict and update rebuild ``S`` with a thin QR; they do not form ``P`` and call `cholesky` again.
+
+Use this form when the estimate must stay numerically well-conditioned, or when you want the EKF's mean and Jacobians without refactoring ``P`` at every step. The mean recursion is the discrete EKF. Only the covariance arithmetic changes. `covariance(filter)` rebuilds ``P = SS^\top`` when a full matrix is needed, for example the ``\pm 3\sqrt{P_{ii}}`` bands in the demo. On a dense, low-dimensional problem the QR is extra work relative to forming ``P``; the return is the stored factor.
+
+**Further reading.**
+
+- Potter, J. E., and Stern, R. G. (1963). Statistical Filtering of Space Navigation Measurements. *Proc. AIAA Guidance and Control Conference*.
+- Kaminski, P. G., Bryson, A. E., and Schmidt, S. F. (1971). [Discrete Square Root Filtering: A Survey of Current Techniques](https://doi.org/10.1109/TAC.1971.1099816). *IEEE Transactions on Automatic Control*, 16(6), 727–736.
+- Bierman, G. J. (1977). *Factorization Methods for Discrete Sequential Estimation*. Academic Press.
+- Grewal, M. S., and Andrews, A. P. (2015). *Kalman Filtering: Theory and Practice Using MATLAB*, 4th ed. Wiley.
+
 ## Prediction
 
 ```math
-x^- = f(t, x, \Delta t), \qquad
-F = \frac{\partial f}{\partial x}(t, x, \Delta t).
+x_{k:k-1} = f\bigl(t_{k-1}, x_{k-1:k-1}, \Delta t\bigr), \qquad
+F = \frac{\partial f}{\partial x}\bigl(t_{k-1}, x_{k-1:k-1}, \Delta t\bigr).
 ```
 
 Let ``S_q`` be a factor of the process noise, ``Q = S_q S_q^\top`` (lower Cholesky when `Q` is positive definite, and an eigenvalue factor when it is only semidefinite). The predicted factor is the thin QR of the stacked transpose
 
 ```math
-\begin{bmatrix} (F S)^\top \\ S_q^\top \end{bmatrix}
+\begin{bmatrix} (F S_{k-1:k-1})^\top \\ S_q^\top \end{bmatrix}
 = Q_r R.
 ```
 
 Rows of ``R`` whose diagonal entry is negative are multiplied by ``-1``, and the stored factor is the lower triangle of ``R^\top``. That gives
 
 ```math
-S^- (S^-)^\top = F S S^\top F^\top + Q
+S_{k:k-1} S_{k:k-1}^\top
+  = F S_{k-1:k-1} S_{k-1:k-1}^\top F^\top + Q
 ```
 
-with a nonnegative diagonal. The mean is ``x^-`` and time advances by ``\Delta t``.
+with a nonnegative diagonal. The mean is ``x_{k:k-1}`` and time advances by ``\Delta t``.
 
 ## Update
 
 ```math
-\hat y = h(t, x), \qquad H = \frac{\partial h}{\partial x}(t, x),
+\hat y_{k:k-1} = h\bigl(t_k, x_{k:k-1}\bigr), \qquad
+H = \frac{\partial h}{\partial x}\bigl(t_k, x_{k:k-1}\bigr),
 ```
 
-and ``R = S_r S_r^\top``. The innovation factor is the same QR map applied to ``[(HS)^\top;\; S_r^\top]``:
+and ``R = S_r S_r^\top``. The innovation factor is the same QR map applied to ``[(H S_{k:k-1})^\top;\; S_r^\top]``:
 
 ```math
-S_y S_y^\top = H S S^\top H^\top + R.
+S_{y,k:k-1} S_{y,k:k-1}^\top
+  = H S_{k:k-1} S_{k:k-1}^\top H^\top + R.
 ```
 
 The gain uses that factor rather than a fresh covariance inverse,
 
 ```math
-K = S (HS)^\top (S_y S_y^\top)^{-1}.
+K = S_{k:k-1} (H S_{k:k-1})^\top
+    \bigl(S_{y,k:k-1} S_{y,k:k-1}^\top\bigr)^{-1}.
 ```
 
 The posterior factor is the Joseph form, again as a thin QR,
 
 ```math
-\begin{bmatrix} ((I - KH) S)^\top \\ (K S_r)^\top \end{bmatrix},
+\begin{bmatrix} ((I - KH) S_{k:k-1})^\top \\ (K S_r)^\top \end{bmatrix},
 ```
 
 so
 
 ```math
-S^+ (S^+)^\top
-  = (I - KH)\, S S^\top\, (I - KH)^\top + K R K^\top,
+S_{k:k} S_{k:k}^\top
+  = (I - KH)\, S_{k:k-1} S_{k:k-1}^\top\, (I - KH)^\top + K R K^\top,
 ```
 
-and ``x \leftarrow x + K(y - \hat y)``.
+and
 
-`update!(filter, model::MeasurementModel, y, R)` reads ``(\hat y, H)`` from `get_h_H`, which is the same measurement object the EKF update accepts.
+```math
+x_{k:k} = x_{k:k-1} + K\bigl(y_{k} - \hat y_{k:k-1}\bigr).
+```
+
+`update!(filter, model::MeasurementModel, y, R)` reads ``(\hat y_{k:k-1}, H)`` from `get_h_H`, which is the same measurement object the EKF update accepts.
 
 ## Two-body demo
 

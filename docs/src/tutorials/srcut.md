@@ -10,19 +10,35 @@ and a positive diagonal. This is the same factor convention as the square-root U
 
 Sigma points and weights come from [`cut_points`](@ref). The default `order` is `4`. Supported orders are CUT4 for every state dimension `n ≥ 1`, and CUT6 for `2 ≤ n ≤ 9`. CUT uses one weight per point for both the mean and the covariance. The two-body demo is `demo/demo_srcut.jl` and uses order 4.
 
+## Motivation
+
+The [covariance-form CUT](@ref cut-tutorial) matches higher Gaussian moments than the UKF, then stores ``P`` and adds the weighted outer products directly. That is the same numerical exposure as the covariance-form UKF: after enough steps, or when a weight is negative, the reconstructed ``P`` can lose definiteness, and the next predict has to factor it again. The square-root CUT keeps a factor ``S`` and applies the van der Merwe / Wan QR-and-downdate arithmetic to the CUT weights.
+
+Use it when you want CUT moment matching and a stored factor that stays positive definite. CUT4 and CUT6 weights on the supported dimensions are nonnegative, so a predict is usually only the QR; the measurement update still downdates ``S_{k:k-1}`` by the columns of ``K S_{y,k:k-1}``. There is no separate "square-root CUT" paper: the cubature is Adurthi, Singla, and Singh, and the factor arithmetic is the square-root UKF applied to those weights.
+
+**Further reading.**
+
+- Adurthi, N., Singla, P., and Singh, T. (2018). [Conjugate Unscented Transformation: Applications to Estimation and Control](https://doi.org/10.1115/1.4037783). *ASME Journal of Dynamic Systems, Measurement, and Control*, 140(3), 030907.
+- van der Merwe, R., and Wan, E. A. (2001). [The Square-Root Unscented Kalman Filter for State and Parameter-Estimation](https://doi.org/10.1109/ICASSP.2001.940586). *Proc. IEEE ICASSP*, 3461–3464.
+
+The CUT orders and the QR / downdate steps are those of the [CUT](@ref cut-tutorial) and [square-root UKF](@ref srukf-tutorial) tutorials.
+
 ## Prediction
 
 Let ``(\xi^{(i)}, w_i)`` be the standard-normal CUT points. The filter points are
 
 ```math
-\chi^{(i)} = x + S \xi^{(i)}.
+\chi_{k-1:k-1}^{(i)} = x_{k-1:k-1} + S_{k-1:k-1} \xi^{(i)}.
 ```
 
 Pass each point through the noise-free model and set
 
 ```math
-\hat x = \sum_i w_i\, f(t, \chi^{(i)}, \Delta t), \qquad
-d^{(i)} = f(t, \chi^{(i)}, \Delta t) - \hat x.
+x_{k:k-1} = \sum_i w_i\, f\bigl(t_{k-1}, \chi_{k-1:k-1}^{(i)}, \Delta t\bigr),
+```
+
+```math
+d^{(i)} = f\bigl(t_{k-1}, \chi_{k-1:k-1}^{(i)}, \Delta t\bigr) - x_{k:k-1}.
 ```
 
 Let ``S_q`` satisfy ``Q = S_q S_q^\top``. Every point with ``w_i > 0`` contributes the column ``\sqrt{w_i}\, d^{(i)}``. Those columns and the columns of ``S_q`` form the thin QR whose lower factor ``S_{\mathrm{qr}}`` is the sign-corrected ``R^\top``, as in the square-root EKF. A zero weight is left out.
@@ -30,45 +46,59 @@ Let ``S_q`` satisfy ``Q = S_q S_q^\top``. Every point with ``w_i > 0`` contribut
 A negative weight is not put in the QR. After ``S_{\mathrm{qr}}`` is built, each negative weight is a Cholesky rank-one downdate in column order. For a lower factor `L` and vector ``\sqrt{-w_i}\, d^{(i)}``, the ``\sigma = -1`` step is the same recurrence as the square-root UKF:
 
 ```math
-r = \sqrt{L_{kk}^2 - w_k^2}, \quad
-c_k = r / L_{kk}, \quad
-s_k = w_k / L_{kk}, \quad
-L_{kk} \leftarrow r,
+r = \sqrt{L_{\ell\ell}^2 - w_\ell^2}, \quad
+c_\ell = r / L_{\ell\ell}, \quad
+s_\ell = w_\ell / L_{\ell\ell}, \quad
+L_{\ell\ell} \leftarrow r,
 ```
 
 ```math
-L_{jk} \leftarrow (L_{jk} - s_k w_j) / c_k, \qquad
-w_j \leftarrow c_k w_j - s_k L_{jk}^{\mathrm{new}}, \qquad j > k.
+L_{j\ell} \leftarrow (L_{j\ell} - s_\ell w_j) / c_\ell, \qquad
+w_j \leftarrow c_\ell w_j - s_\ell L_{j\ell}^{\mathrm{new}}, \qquad j > \ell.
 ```
 
 Here ``w`` in the recurrence is the downdate vector, not the CUT weight. The result satisfies
 
 ```math
-S^- (S^-)^\top
+S_{k:k-1} S_{k:k-1}^\top
   = \sum_{w_i > 0} w_i\, d^{(i)} (d^{(i)})^\top
   + Q
   - \sum_{w_i < 0} |w_i|\, d^{(i)} (d^{(i)})^\top,
 ```
 
-which is the CUT covariance ``\sum_i w_i d^{(i)}(d^{(i)})^\top + Q``. CUT4 and CUT6 weights on the supported dimensions are nonnegative, so those predicts only use the QR. The downdate is how a negative CUT weight would be applied to `S`. The mean is ``\hat x`` and time advances by ``\Delta t``.
+which is the CUT covariance ``P_{k:k-1} = \sum_i w_i d^{(i)}(d^{(i)})^\top + Q``. CUT4 and CUT6 weights on the supported dimensions are nonnegative, so those predicts only use the QR. The downdate is how a negative CUT weight would be applied to ``S_{k:k-1}``. The mean is ``x_{k:k-1}`` and time advances by ``\Delta t``.
 
 ## Update
 
-Redraw ``\chi^{(i)} = \hat x + S^- \xi^{(i)}`` and set ``\gamma^{(i)} = h(t, \chi^{(i)})``, ``\hat y = \sum_i w_i \gamma^{(i)}``. The innovation factor ``S_y`` is the same QR and negative-weight downdate applied to the measurement deviations and a factor of `R`. The cross-covariance keeps the CUT weights, including any negative ones:
+Redraw ``\chi_{k:k-1}^{(i)} = x_{k:k-1} + S_{k:k-1} \xi^{(i)}`` and set ``\gamma^{(i)} = h\bigl(t_k, \chi_{k:k-1}^{(i)}\bigr)``, ``\hat y_{k:k-1} = \sum_i w_i \gamma^{(i)}``. The innovation factor ``S_{y,k:k-1}`` is the same QR and negative-weight downdate applied to the measurement deviations and a factor of `R`. The cross-covariance keeps the CUT weights, including any negative ones:
 
 ```math
-P_{xy} = \sum_i w_i (\chi^{(i)} - \hat x)(\gamma^{(i)} - \hat y)^\top,
-\qquad
-K = P_{xy} (S_y S_y^\top)^{-1}.
+P_{xy,k:k-1}
+  = \sum_i w_i
+    \bigl(\chi_{k:k-1}^{(i)} - x_{k:k-1}\bigr)
+    \bigl(\gamma^{(i)} - \hat y_{k:k-1}\bigr)^\top,
 ```
-
-With ``U = K S_y``, the posterior factor downdates one column of `U` at a time,
 
 ```math
-S^+ (S^+)^\top = S^- (S^-)^\top - \sum_{j=1}^{n_y} U_{:,j} U_{:,j}^\top,
+K = P_{xy,k:k-1}
+    \bigl(S_{y,k:k-1} S_{y,k:k-1}^\top\bigr)^{-1}.
 ```
 
-and ``x \leftarrow x + K(y - \hat y)``. That is the additive update ``P - K S_y S_y^\top K^\top``.
+With ``U = K S_{y,k:k-1}``, the posterior factor downdates one column of `U` at a time,
+
+```math
+S_{k:k} S_{k:k}^\top
+  = S_{k:k-1} S_{k:k-1}^\top
+    - \sum_{j=1}^{n_y} U_{:,j} U_{:,j}^\top,
+```
+
+and
+
+```math
+x_{k:k} = x_{k:k-1} + K\bigl(y_{k} - \hat y_{k:k-1}\bigr).
+```
+
+That is the additive update ``P_{k:k} = P_{k:k-1} - K S_{y,k:k-1} S_{y,k:k-1}^\top K^\top``.
 
 ## Two-body demo
 
