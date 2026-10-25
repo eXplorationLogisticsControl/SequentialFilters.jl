@@ -163,8 +163,9 @@ covariance. Sigma points are redrawn from the current mean and covariance,
 passed through `h`, and combined with the CUT cubature moments. The Kalman
 gain uses those moments. No Jacobian is required.
 
-Posterior covariance is `P - K S Kᵀ`, then symmetrized, where `S` is the
-innovation covariance.
+Posterior covariance is the Joseph form
+`P - Pxy Kᵀ - K Pxyᵀ + K S Kᵀ`, then symmetrized, where `S` is the
+innovation covariance and `Pxy` is the state–measurement cross-covariance.
 """
 function update!(filter::ConjugateUnscentedKalmanFilter, h, y, R)
     yv = _measurement_vector(y)
@@ -189,7 +190,7 @@ function update!(filter::ConjugateUnscentedKalmanFilter, h, y, R)
     Pxy = _cross_covariance(X, x_prior, Y, yhat, w)
     K = Pxy / S
     x_new = x_prior .+ (K * (yv .- yhat))
-    P_new = P_prior - K * S * K'
+    P_new = P_prior - Pxy * K' - K * Pxy' + K * S * K'
     filter.x .= x_new
     filter.P .= _symmetrize(P_new)
     return nothing
