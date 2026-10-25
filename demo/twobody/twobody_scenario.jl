@@ -48,7 +48,7 @@ function load_twobody_case()
         Tsit5();
         reltol = 1e-12,
         abstol = 1e-12,
-        saveat = Δt,
+        dense = true,
     )
 
     function station_state(t)
