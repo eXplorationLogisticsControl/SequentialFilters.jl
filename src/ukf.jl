@@ -26,8 +26,9 @@ Small `alpha` keeps the points close to the mean and approaches a derivative
 expansion; for models that are strongly nonlinear across the covariance, use
 a larger `alpha` (up to about 1).
 
-`f` and `h` passed to `predict!` and `update!` are noise-free.
-`Q` and `R` are added after the unscented transform. No Jacobians are required.
+`predict!` propagates the sigma points through a [`DynamicsModel`](@ref) with
+[`EnsemblePropagation`](@ref). `update!` takes a noise-free `h`. `Q` and `R`
+are added after the unscented transform. No Jacobians are required.
 `n + κ` must be positive so that `n + λ = α² (n + κ)` is positive.
 
 The constructor copies `x` and `P`. Fields `t`, `x`, and `P` are the current
@@ -158,42 +159,53 @@ end
 
 
 """
-    predict!(filter::UnscentedKalmanFilter, f, Q, Δt)
+    predict!(filter::UnscentedKalmanFilter, dynamics_model::DynamicsModel, process_noise_model::ProcessNoiseModel, Δt::Float64; save_everystep=false, saveat=(), ensemblealg=EnsembleSerial())
 
-Discrete-time prediction with additive process noise.
+Propagate the sigma points with [`EnsemblePropagation`](@ref) and add
+`Q = get_noise(process_noise_model, Δt)` to the covariance.
 
-`f(t, x, Δt)` is the noise-free process model and must return a vector of
-length `filter.nx`. Each current sigma point is passed through `f`. The
-predicted mean and covariance are the weighted unscented moments, and `Q` is
-added to the covariance. `filter.t` advances by `Δt`.
+The default `ensemblealg` is [`EnsembleSerial`](@ref) (one sigma point at a
+time). Pass [`EnsembleThreads`](@ref), [`EnsembleDistributed`](@ref), or
+[`EnsembleSplitThreads`](@ref) to run the points in parallel. `save_everystep`
+and `saveat` match [`ExtendedKalmanFilter`](@ref).
 
-`Q` is an `nx × nx` covariance (`Matrix` or `Diagonal`). Derivatives of `f`
-are not used.
+The returned `ODESolution` stores `[μ; vec(Φ)]`. `Φ(t) P_start Φᵀ` is the
+unscented covariance of the propagated points and does not yet include `Q`.
+`filter.P` includes `Q`. `filter.t` advances by `Δt`.
 """
-function predict!(filter::UnscentedKalmanFilter, f, Q, Δt::Real)
+function predict!(
+    filter::UnscentedKalmanFilter,
+    dynamics_model::DynamicsModel,
+    process_noise_model::ProcessNoiseModel,
+    Δt::Float64;
+    save_everystep::Bool = false,
+    saveat = (),
+    ensemblealg = EnsembleSerial(),
+)
+    _check_step(Δt)
     nx = filter.nx
-    Qm = _square_matrix(Q, nx, "Q")
-    Δt64 = Float64(Δt)
-    isfinite(Δt64) || throw(ArgumentError("Δt must be finite, got $Δt"))
-    t = filter.t
+    Qm = _square_matrix(get_noise(process_noise_model, Δt), nx, "Q")
     weights = _filter_weights(filter)
     X = get_sigma_points(filter)
-    Xprop = Matrix{Float64}(undef, nx, size(X, 2))
-    for i in axes(X, 2)
-        xi = f(t, X[:, i], Δt64)
-        length(xi) == nx || throw(
-            DimensionMismatch("f returned length $(length(xi)); expected $nx"),
-        )
-        for j in 1:nx
-            Xprop[j, i] = xi[j]
-        end
-    end
+    P_start = copy(filter.P)
+    Xprop, sol = _cloud_predict(
+        dynamics_model,
+        X,
+        P_start,
+        weights.Wm,
+        weights.Wc,
+        filter.t,
+        Δt;
+        ensemblealg = ensemblealg,
+        save_everystep = save_everystep,
+        saveat = saveat,
+    )
     μ = _weighted_column_mean(Xprop, weights.Wm)
     P = _deviation_covariance(Xprop, μ, weights.Wc) + Qm
     filter.x .= μ
     filter.P .= _symmetrize(P)
-    filter.t = t + Δt64
-    return nothing
+    filter.t = filter.t + Δt
+    return sol
 end
 
 

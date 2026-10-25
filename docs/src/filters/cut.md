@@ -38,6 +38,8 @@ P_{k:k-1} = \sum_i w_i
 
 ``P_{k:k-1}`` is symmetrized, and time advances by ``\Delta t``. A zero weight adds nothing. For CUT4 with `n ≥ 3` the center weight is zero, and that point is omitted.
 
+`predict!` takes a [`DynamicsModel`](@ref) and a [`ProcessNoiseModel`](@ref). ``Q`` is `get_noise(process_noise_model, Δt)`. The CUT points are propagated by [`EnsemblePropagation`](@ref). The default `ensemblealg` is [`EnsembleSerial`](@ref). Pass [`EnsembleThreads`](@ref), [`EnsembleDistributed`](@ref), or [`EnsembleSplitThreads`](@ref) to change the parallelism. A [`NonlinearODEModel`](@ref) is one `EnsembleProblem`. A [`DiscreteDynamicsModel`](@ref) evaluates `f(t, x, Δt)` on each point. The returned `ODESolution` stores `[x; vec(Φ)]`, and ``\Phi P_{\mathrm{start}} \Phi^\top`` is the cubature covariance before ``Q`` is added. `filter.P` includes ``Q``.
+
 ## Update
 
 Sigma points are redrawn from the prior ``\bigl(x_{k:k-1}, P_{k:k-1}\bigr)`` and passed through ``h(t, x)``:
@@ -75,19 +77,21 @@ P_{k:k}
 
 ## Two-body demo
 
-`demo/demo_cut.jl` uses the same 7000 km orbit, initial mean and covariance, range and range-rate measurements, and noise as the EKF demo. Process noise is an [`UnbiasedRandomProcess`](@ref) with scale `1e-6`. The filter order is 4. The figure is the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``, written to `demo/output/twobody_cut_errors.png`.
+`demo/demo_cut.jl` uses the same 7000 km orbit, initial mean and covariance, range and range-rate measurements, and noise as the EKF demo. Process noise is an [`UnbiasedRandomProcess`](@ref) with scale `1e-6`. The filter order is 4. The figure samples the returned `ODESolution` and draws the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``, written to `demo/twobody_cut_errors.png`.
 
 ```julia
 using SequentialFilters
 
-order = 4
-filt = ConjugateUnscentedKalmanFilter(0.0, x_hat0, P0; order = order)
-Qmodel = UnbiasedRandomProcess(1.0e-6)
+filt = ConjugateUnscentedKalmanFilter(0.0, x_hat0, P0; order = 4)
+dynamics = NonlinearODEModel(twobody!; n = n, p = μ)
+process_noise_model = UnbiasedRandomProcess(1.0e-6)
 for k in 1:n_meas
-    predict!(filt, propagate, get_noise(Qmodel, Δt), Δt)
+    predict!(filt, dynamics, process_noise_model, Δt)
     update!(filt, range_rangerate, ys[k], R)
 end
 ```
+
+The default propagation is `ensemblealg = EnsembleSerial()`. Pass `EnsembleThreads()`, `EnsembleDistributed()`, or `EnsembleSplitThreads()` to run the CUT points in parallel.
 
 `demo/demo_srcut.jl` prints elapsed time, process CPU time, and allocations for this filter and the square-root CUT. Both two-body runs propagate the same CUT4 points. The linear kernel is 5000 steps of a 6-state model with ``f(x) = Fx`` and no ODE.
 
@@ -106,7 +110,7 @@ H = [1.0 0.0]
 Q = [1.0e-3 0.0; 0.0 1.0e-3]
 R = [0.05;;]
 filt = ConjugateUnscentedKalmanFilter(0.0, [0.0, 1.0], Matrix{Float64}(I, 2, 2); order = 4)
-predict!(filt, (t, x, Δt) -> F * x, Q, 1.0)
+predict!(filt, DiscreteDynamicsModel((t, x, Δt) -> F * x; n = 2), AdditiveProcessNoise(Q), 1.0)
 update!(filt, (t, x) -> H * x, [0.2], R)
 filt.x
 ```

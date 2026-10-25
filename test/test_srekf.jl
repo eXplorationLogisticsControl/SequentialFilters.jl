@@ -62,7 +62,8 @@ end
         x_before = copy(srekf.x)
         sol = predict!(ekf, dynamics, noise, Δt)
         Φ = reshape(sol.u[end][7:end], 6, 6)
-        predict!(srekf, (t, x, dt) -> Φ * x, Φ, Q, Δt)
+        sol_sr = predict!(srekf, dynamics, noise, Δt)
+        @test length(sol_sr.u[end]) == 6 * 7
         P_formula = Φ * P_before * Φ' + Q
         P_formula = (P_formula + P_formula') ./ 2
         @test srekf.x ≈ Φ * x_before atol = 1e-10 rtol = 1e-10
@@ -91,9 +92,8 @@ end
     S_before = copy(fresh.S)
     @test_throws DimensionMismatch predict!(
         fresh,
-        (t, x, dt) -> x[1:5],
-        Matrix{Float64}(I, 6, 6),
-        Q,
+        DiscreteDynamicsModel((t, x, dt) -> x[1:5]; n = 6),
+        AdditiveProcessNoise(Q),
         Δt,
     )
     @test fresh.x == x_before

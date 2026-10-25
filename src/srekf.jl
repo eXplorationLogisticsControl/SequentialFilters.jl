@@ -45,39 +45,134 @@ end
 
 
 """
-    predict!(filter::SquareRootExtendedKalmanFilter, f, F, Q, Δt)
+    predict!(filter::SquareRootExtendedKalmanFilter, dynamics_model::DynamicsModel, process_noise_model::ProcessNoiseModel, Δt::Float64; save_everystep=false, saveat=())
 
-Noise-free process model `f(t, x, Δt)` and its Jacobian. `F` is either an
-`nx × nx` matrix or a function `F(t, x, Δt)` returning that Jacobian. `Q` is
-the additive process-noise covariance.
+Propagate the mean with `dynamics_model` and rebuild the covariance factor
+from the state-transition matrix.
 
-The predicted factor comes from the thin QR of `[(F*S)'; Sq']`, where `Sq`
-is a factor of `Q` (`Q = Sq * Sq'`). The stored `S` is the lower-triangular
-transpose of that R factor, with a positive diagonal.
+A [`NonlinearODEModel`](@ref) integrates the same augmented state as the
+extended Kalman filter. `Φ` is read from that `ODESolution`, which is
+returned. A [`DiscreteDynamicsModel`](@ref) evaluates `f` and its Jacobian
+(`discrete_jacobian`: the stored Jacobian, or ForwardDiff). The returned
+solution still stores `[x; vec(Φ)]` so the EKF covariance plot can read it.
+
+`Q = get_noise(process_noise_model, Δt)`. The predicted factor is the thin QR
+of `[(Φ*S)'; Sq']`. This filter propagates one trajectory, so it has no
+`ensemblealg` argument.
 """
-function predict!(filter::SquareRootExtendedKalmanFilter, f, Fjac, Q, Δt::Real)
+function predict!(
+    filter::SquareRootExtendedKalmanFilter,
+    dynamics_model::DynamicsModel,
+    process_noise_model::ProcessNoiseModel,
+    Δt::Float64;
+    save_everystep::Bool = false,
+    saveat = (),
+)
+    _check_step(Δt)
     nx = filter.nx
-    Qm = _square_matrix(Q, nx, "Q")
-    Δt64 = Float64(Δt)
-    isfinite(Δt64) || throw(ArgumentError("Δt must be finite, got $Δt"))
-    t = filter.t
-    xnew = f(t, filter.x, Δt64)
-    length(xnew) == nx || throw(
-        DimensionMismatch("f returned length $(length(xnew)); expected $nx"),
+    Qm = _square_matrix(get_noise(process_noise_model, Δt), nx, "Q")
+    xnew, Φ, sol = _srekf_transition(
+        filter,
+        dynamics_model,
+        process_noise_model,
+        Δt;
+        save_everystep = save_everystep,
+        saveat = saveat,
     )
-    F = _state_jacobian(Fjac, t, filter.x, Δt64)
-    if size(F) != (nx, nx)
-        throw(DimensionMismatch("F is $(size(F)); expected ($nx, $nx)"))
+    if size(Φ) != (nx, nx)
+        throw(DimensionMismatch("F is $(size(Φ)); expected ($nx, $nx)"))
     end
-    FS = F * filter.S
+    length(xnew) == nx || throw(
+        DimensionMismatch("dynamics returned length $(length(xnew)); expected $nx"),
+    )
+    FS = Φ * filter.S
     Nf = _noise_factor(Qm)
     M = size(Nf, 2) == 0 ? FS' : vcat(FS', Nf')
     filter.S .= _qr_lower_factor(M)
     for j in 1:nx
         filter.x[j] = xnew[j]
     end
-    filter.t = t + Δt64
-    return nothing
+    filter.t = filter.t + Δt
+    return sol
+end
+
+function _srekf_transition(
+    filter::SquareRootExtendedKalmanFilter,
+    dynamics::NonlinearODEModel,
+    noise::ProcessNoiseModel,
+    Δt::Float64;
+    save_everystep::Bool = false,
+    saveat = (),
+)
+    nx = filter.nx
+    x = copy(filter.x)
+    P = Matrix{Float64}(I, nx, nx)
+    tF, sol = propagate!(
+        dynamics,
+        noise,
+        filter.t,
+        Δt,
+        x,
+        P;
+        save_everystep = save_everystep,
+        saveat = saveat,
+    )
+    Φ = Matrix{Float64}(reshape(sol.u[end][(nx + 1):end], nx, nx))
+    tF == filter.t + Δt || error("square-root EKF propagation ended at $tF")
+    return x, Φ, sol
+end
+
+function _srekf_transition(
+    filter::SquareRootExtendedKalmanFilter,
+    dynamics::DiscreteDynamicsModel,
+    ::ProcessNoiseModel,
+    Δt::Float64;
+    save_everystep::Bool = false,
+    saveat = (),
+)
+    nx = filter.nx
+    if dynamics.n != nx
+        throw(DimensionMismatch("dynamics dimension is $(dynamics.n); filter state is $nx"))
+    end
+    t = filter.t
+    xnew = dynamics.f(t, filter.x, Δt)
+    length(xnew) == nx || throw(
+        DimensionMismatch("f returned length $(length(xnew)); expected $nx"),
+    )
+    Φ = Matrix{Float64}(discrete_jacobian(dynamics, t, filter.x, Δt))
+    if size(Φ) != (nx, nx)
+        throw(DimensionMismatch("F is $(size(Φ)); expected ($nx, $nx)"))
+    end
+    sol = _discrete_transition_solution(filter.x, xnew, Φ, t, Δt; save_everystep, saveat)
+    return collect(Float64, xnew), Φ, sol
+end
+
+function _discrete_transition_solution(x0, x1, Φ, t, Δt; save_everystep::Bool = false, saveat = ())
+    times = _discrete_times(t, Δt, saveat, save_everystep)
+    n = length(x0)
+    x0v = collect(Float64, x0)
+    x1v = collect(Float64, x1)
+    Φ64 = Matrix{Float64}(Φ)
+    eye = Matrix{Float64}(I, n, n)
+    span = Δt == 0 ? 1.0 : Δt
+    us = Vector{Vector{Float64}}(undef, length(times))
+    for (k, τ) in enumerate(times)
+        α = (τ - t) / span
+        μ = (1 - α) .* x0v .+ α .* x1v
+        Φk = (1 - α) .* eye .+ α .* Φ64
+        u = zeros(Float64, n * (n + 1))
+        u[1:n] .= μ
+        u[(n + 1):end] .= vec(Φk)
+        us[k] = u
+    end
+    prob = ODEProblem((du, u, p, t_ode) -> (du .= 0), us[1], (times[1], times[end]))
+    return SciMLBase.build_solution(
+        prob,
+        Tsit5(),
+        times,
+        us;
+        retcode = SciMLBase.ReturnCode.Success,
+    )
 end
 
 

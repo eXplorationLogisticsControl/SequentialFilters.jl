@@ -43,6 +43,33 @@ function get_noise(noise_model::UnbiasedRandomProcess, Δt::Float64)
 end
 
 
+"""
+    AdditiveProcessNoise(Q)
+
+Discrete process-noise covariance added at the end of one predict step.
+
+`Q` is an `n × n` covariance (`Matrix` or `Diagonal`). [`get_noise`](@ref)
+returns that matrix and does not scale it by `Δt`. Use this for a discrete
+map. [`UnbiasedRandomProcess`](@ref) remains the 6-state continuous model
+whose discrete covariance grows with `Δt`.
+"""
+struct AdditiveProcessNoise{M<:AbstractMatrix{<:Real}} <: ProcessNoiseModel
+    Q::M
+
+    function AdditiveProcessNoise(Q::AbstractMatrix{<:Real})
+        if size(Q, 1) != size(Q, 2)
+            throw(DimensionMismatch("Q is $(size(Q)); expected a square covariance"))
+        end
+        return new{typeof(Q)}(Q)
+    end
+end
+
+function get_noise(noise_model::AdditiveProcessNoise, Δt::Float64)
+    isfinite(Δt) || throw(ArgumentError("Δt must be finite, got $Δt"))
+    return noise_model.Q
+end
+
+
 """Continuous-time dynamics integrated over one filter predict step."""
 abstract type DynamicsModel end
 
@@ -88,6 +115,43 @@ function NonlinearODEModel(
     u0 = zeros(n * (n + 1))
     prob = ODEProblem(augmented!, u0, (0.0, 1.0), p)
     return NonlinearODEModel(eom!, p, method, reltol, abstol, n, augmented!, prob)
+end
+
+
+"""
+    DiscreteDynamicsModel(f; n, jacobian=nothing)
+
+Noise-free discrete map `f(t, x, Δt)` of an `n`-dimensional state.
+
+Sigma-point and particle filters push each point through `f`. The
+square-root EKF also needs the Jacobian of `f`. Pass `jacobian(t, x, Δt)`,
+or leave it unset and the square-root EKF builds that matrix with ForwardDiff.
+`jacobian` is not used by the unscented, CUT, cubature, or particle filters.
+"""
+struct DiscreteDynamicsModel{F,J} <: DynamicsModel
+    f::F
+    jacobian::J
+    n::Int
+
+    function DiscreteDynamicsModel(f; n::Integer, jacobian = nothing)
+        n_int = Int(n)
+        n_int >= 1 || throw(ArgumentError("state dimension must be positive, got $n_int"))
+        return new{typeof(f), typeof(jacobian)}(f, jacobian, n_int)
+    end
+end
+
+"""
+Jacobian of a discrete map. A stored `jacobian` is called as
+`jacobian(t, x, Δt)`. Otherwise the columns are ForwardDiff derivatives of `f`.
+"""
+function discrete_jacobian(model::DiscreteDynamicsModel, t, x, Δt)
+    if model.jacobian !== nothing
+        return model.jacobian(t, x, Δt)
+    end
+    x_eval = x isa Vector ? x : collect(x)
+    return ForwardDiff.jacobian(x_eval) do z
+        return collect(model.f(t, z, Δt))
+    end
 end
 
 """

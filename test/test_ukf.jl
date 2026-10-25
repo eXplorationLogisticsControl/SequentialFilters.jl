@@ -97,14 +97,27 @@ end
     # the predicted variance equals β. β = 2 recovers Var(x^2) = 2.
     for beta in (0.0, 2.0, 3.0)
         ukf = UnscentedKalmanFilter(0.0, [0.0], [1.0;;]; alpha = 1.0, beta = beta, kappa = 0.0)
-        predict!(ukf, (t, x, Δt) -> [x[1]^2], zeros(1, 1), 1.0)
+        sol = predict!(
+            ukf,
+            DiscreteDynamicsModel((t, x, Δt) -> [x[1]^2]; n = 1),
+            AdditiveProcessNoise(zeros(1, 1)),
+            1.0,
+        )
         @test ukf.x[1] ≈ 1.0 atol = 1e-12
         @test ukf.P[1, 1] ≈ beta atol = 1e-12
         @test ukf.t ≈ 1.0
+        @test sol.t[end] ≈ 1.0
+        @test length(sol.u[end]) == 2
     end
 
     ukf = UnscentedKalmanFilter(0.0, [0.0], [1.0;;])
-    predict!(ukf, (t, x, Δt) -> [x[1]^2], zeros(1, 1), 1.0)
+    predict!(
+        ukf,
+        DiscreteDynamicsModel((t, x, Δt) -> [x[1]^2]; n = 1),
+        AdditiveProcessNoise(zeros(1, 1)),
+        1.0;
+        ensemblealg = EnsembleThreads(),
+    )
     @test ukf.alpha == 1e-3
     @test ukf.x[1] ≈ 1.0 atol = 1e-6
     @test ukf.P[1, 1] ≈ 2.0 atol = 1e-6
@@ -130,13 +143,15 @@ function kalman_vs_ukf_errors(; F, H, Q, R, x0, P0, nsteps, seed, alpha = 1e-3)
     ukf = UnscentedKalmanFilter(0.0, x0, P0; alpha = alpha, beta = 2.0, kappa = 0.0)
     f = (t, x, Δt) -> F * x
     h = (t, x) -> H * x
+    dynamics = DiscreteDynamicsModel(f; n = nx)
+    noise = AdditiveProcessNoise(Qm)
     max_x = 0.0
     max_P = 0.0
     for k in 1:nsteps
         x_kf = F * x_kf
         P_kf = (F * P_kf * F' + Qm)
         P_kf = (P_kf + P_kf') ./ 2
-        predict!(ukf, f, Qm, 1.0)
+        predict!(ukf, dynamics, noise, 1.0)
         max_x = max(max_x, norm(ukf.x .- x_kf))
         max_P = max(max_P, norm(ukf.P .- P_kf))
 
@@ -213,8 +228,8 @@ end
     diagf = UnscentedKalmanFilter(0.0, x0, P0)
     f = (t, x, Δt) -> F * x
     h = (t, x) -> H * x
-    predict!(dense, f, Matrix(Qd), 0.2)
-    predict!(diagf, f, Qd, 0.2)
+    predict!(dense, DiscreteDynamicsModel(f; n = 2), AdditiveProcessNoise(Matrix(Qd)), 0.2)
+    predict!(diagf, DiscreteDynamicsModel(f; n = 2), AdditiveProcessNoise(Qd), 0.2)
     update!(dense, h, y, Matrix(Rd))
     update!(diagf, h, y, Rd)
     @test diagf.x ≈ dense.x atol = 1e-12
@@ -225,8 +240,8 @@ end
     P_before = copy(ukf.P)
     @test_throws DimensionMismatch predict!(
         ukf,
-        (t, x, Δt) -> [x[1]],
-        [0.1 0.0; 0.0 0.1],
+        DiscreteDynamicsModel((t, x, Δt) -> [x[1]]; n = 2),
+        AdditiveProcessNoise([0.1 0.0; 0.0 0.1]),
         0.1,
     )
     @test ukf.x == x_before
@@ -299,7 +314,7 @@ end
     pos_err = Float64[]
     vel_err = Float64[]
     for k in 1:nsteps
-        predict!(ukf, coordinated_turn, Q, Δt)
+        predict!(ukf, DiscreteDynamicsModel(coordinated_turn; n = 5), AdditiveProcessNoise(Q), Δt)
         @test posterior_is_spd(ukf.P)
         update!(ukf, range_bearing, ys[k], R)
         @test posterior_is_spd(ukf.P)
@@ -355,7 +370,7 @@ end
     ukf = UnscentedKalmanFilter(0.0, [0.0], [1.0;;]; alpha = 1.0, beta = 2.0, kappa = 0.0)
     errors = Float64[]
     for k in 1:nsteps
-        predict!(ukf, ungm_f, Q, Δt)
+        predict!(ukf, DiscreteDynamicsModel(ungm_f; n = 1), AdditiveProcessNoise(Q), Δt)
         update!(ukf, ungm_h, ys[k], R)
         @test posterior_is_spd(ukf.P)
         push!(errors, abs(ukf.x[1] - truth[k]))

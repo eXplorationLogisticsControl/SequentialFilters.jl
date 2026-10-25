@@ -9,6 +9,7 @@ of several warmed runs. Allocations are those of that same run.
 
 using LinearAlgebra
 using Printf
+using Random
 
 import SequentialFilters: predict!, update!, covariance
 
@@ -101,7 +102,7 @@ end
 function run_srekf(case)
     filt = SquareRootExtendedKalmanFilter(0.0, case.x_hat0, case.P0)
     for k in 1:case.n_meas
-        predict!(filt, case.f, case.F, case.Q, case.Δt)
+        predict!(filt, case.dynamics, case.process_noise, case.Δt)
         update!(filt, case.h, case.H, case.ys[k], case.R)
     end
     return filt
@@ -110,7 +111,7 @@ end
 function run_ukf(case)
     filt = UnscentedKalmanFilter(0.0, case.x_hat0, case.P0)
     for k in 1:case.n_meas
-        predict!(filt, case.f, case.Q, case.Δt)
+        predict!(filt, case.dynamics, case.process_noise, case.Δt)
         update!(filt, case.h, case.ys[k], case.R)
     end
     return filt
@@ -119,7 +120,7 @@ end
 function run_srukf(case)
     filt = SquareRootUnscentedKalmanFilter(0.0, case.x_hat0, case.P0)
     for k in 1:case.n_meas
-        predict!(filt, case.f, case.Q, case.Δt)
+        predict!(filt, case.dynamics, case.process_noise, case.Δt)
         update!(filt, case.h, case.ys[k], case.R)
     end
     return filt
@@ -128,7 +129,7 @@ end
 function run_srckf(case)
     filt = SquareRootCubatureKalmanFilter(0.0, case.x_hat0, case.P0)
     for k in 1:case.n_meas
-        predict!(filt, case.f, case.Q, case.Δt)
+        predict!(filt, case.dynamics, case.process_noise, case.Δt)
         update!(filt, case.h, case.ys[k], case.R)
     end
     return filt
@@ -177,20 +178,28 @@ function run_discrete_srekf()
     filt = SquareRootExtendedKalmanFilter(0.0, model.x0, model.P0)
     f = (t, x, dt) -> model.F * x
     h = (t, x) -> model.H * x
+    dynamics = DiscreteDynamicsModel(f; n = 6, jacobian = (t, x, dt) -> model.F)
+    noise = AdditiveProcessNoise(model.Q)
     for _ in 1:model.nsteps
-        predict!(filt, f, model.F, model.Q, 1.0)
+        predict!(filt, dynamics, noise, 1.0)
         update!(filt, h, model.H, model.y, model.R)
     end
     return filt
 end
 
+function _linear_step(model)
+    dynamics = DiscreteDynamicsModel((t, x, dt) -> model.F * x; n = 6)
+    noise = AdditiveProcessNoise(model.Q)
+    h = (t, x) -> model.H * x
+    return dynamics, noise, h
+end
+
 function run_discrete_ukf()
     model = _linear_model()
     filt = UnscentedKalmanFilter(0.0, model.x0, model.P0)
-    f = (t, x, dt) -> model.F * x
-    h = (t, x) -> model.H * x
+    dynamics, noise, h = _linear_step(model)
     for _ in 1:model.nsteps
-        predict!(filt, f, model.Q, 1.0)
+        predict!(filt, dynamics, noise, 1.0)
         update!(filt, h, model.y, model.R)
     end
     return filt
@@ -199,7 +208,7 @@ end
 function run_cut(case)
     filt = ConjugateUnscentedKalmanFilter(0.0, case.x_hat0, case.P0; order = 4)
     for k in 1:case.n_meas
-        predict!(filt, case.f, case.Q, case.Δt)
+        predict!(filt, case.dynamics, case.process_noise, case.Δt)
         update!(filt, case.h, case.ys[k], case.R)
     end
     return filt
@@ -208,7 +217,7 @@ end
 function run_srcut(case)
     filt = SquareRootConjugateUnscentedKalmanFilter(0.0, case.x_hat0, case.P0; order = 4)
     for k in 1:case.n_meas
-        predict!(filt, case.f, case.Q, case.Δt)
+        predict!(filt, case.dynamics, case.process_noise, case.Δt)
         update!(filt, case.h, case.ys[k], case.R)
     end
     return filt
@@ -217,10 +226,9 @@ end
 function run_discrete_cut()
     model = _linear_model()
     filt = ConjugateUnscentedKalmanFilter(0.0, model.x0, model.P0; order = 4)
-    f = (t, x, dt) -> model.F * x
-    h = (t, x) -> model.H * x
+    dynamics, noise, h = _linear_step(model)
     for _ in 1:model.nsteps
-        predict!(filt, f, model.Q, 1.0)
+        predict!(filt, dynamics, noise, 1.0)
         update!(filt, h, model.y, model.R)
     end
     return filt
@@ -229,10 +237,9 @@ end
 function run_discrete_srcut()
     model = _linear_model()
     filt = SquareRootConjugateUnscentedKalmanFilter(0.0, model.x0, model.P0; order = 4)
-    f = (t, x, dt) -> model.F * x
-    h = (t, x) -> model.H * x
+    dynamics, noise, h = _linear_step(model)
     for _ in 1:model.nsteps
-        predict!(filt, f, model.Q, 1.0)
+        predict!(filt, dynamics, noise, 1.0)
         update!(filt, h, model.y, model.R)
     end
     return filt
@@ -241,10 +248,9 @@ end
 function run_discrete_srukf()
     model = _linear_model()
     filt = SquareRootUnscentedKalmanFilter(0.0, model.x0, model.P0)
-    f = (t, x, dt) -> model.F * x
-    h = (t, x) -> model.H * x
+    dynamics, noise, h = _linear_step(model)
     for _ in 1:model.nsteps
-        predict!(filt, f, model.Q, 1.0)
+        predict!(filt, dynamics, noise, 1.0)
         update!(filt, h, model.y, model.R)
     end
     return filt
@@ -253,10 +259,29 @@ end
 function run_discrete_srckf()
     model = _linear_model()
     filt = SquareRootCubatureKalmanFilter(0.0, model.x0, model.P0)
-    f = (t, x, dt) -> model.F * x
-    h = (t, x) -> model.H * x
+    dynamics, noise, h = _linear_step(model)
     for _ in 1:model.nsteps
-        predict!(filt, f, model.Q, 1.0)
+        predict!(filt, dynamics, noise, 1.0)
+        update!(filt, h, model.y, model.R)
+    end
+    return filt
+end
+
+function run_particle(case; n_particles::Integer = 64)
+    filt = ParticleFilter(0.0, case.x_hat0, case.P0; n_particles = n_particles, rng = MersenneTwister(1))
+    for k in 1:case.n_meas
+        predict!(filt, case.dynamics, case.process_noise, case.Δt)
+        update!(filt, case.measurements, case.ys[k], case.R)
+    end
+    return filt
+end
+
+function run_discrete_particle()
+    model = _linear_model()
+    filt = ParticleFilter(0.0, model.x0, model.P0; n_particles = 32, rng = MersenneTwister(1))
+    dynamics, noise, h = _linear_step(model)
+    for _ in 1:200
+        predict!(filt, dynamics, noise, 1.0)
         update!(filt, h, model.y, model.R)
     end
     return filt
@@ -265,10 +290,11 @@ end
 """
     print_filter_costs(case, pair)
 
-`pair` is `:ekf`, `:ukf`, `:cut`, or `:srckf`. The first three print two-body and
-linear-kernel costs for the covariance-form filter and its square-root form.
-The CUT pair uses order 4. `:srckf` times the square-root cubature filter alone:
-this package has no covariance-form cubature filter to pair with it.
+`pair` is `:ekf`, `:ukf`, `:cut`, `:srckf`, or `:particle`. The first three print
+two-body and linear-kernel costs for the covariance-form filter and its
+square-root form. The CUT pair uses order 4. `:srckf` times the square-root
+cubature filter alone. `:particle` times a 64-particle two-body run and a
+32-particle linear kernel of 200 steps.
 """
 function print_filter_costs(case, pair::Symbol)
     println()
@@ -322,8 +348,15 @@ function print_filter_costs(case, pair::Symbol)
         square_root_cost = measure_cost(run_discrete_srckf; samples = 5)
         _print_cost("square-root CKF", square_root_cost)
         println("There is no covariance-form cubature filter in this package, so no ratio is printed.")
+    elseif pair == :particle
+        println("two-body recursion (64 particles, serial ensemble, one warmed run)")
+        particle_cost = measure_cost(() -> run_particle(case); samples = 1)
+        _print_cost("particle filter", particle_cost)
+        println("linear kernel (32 particles, 6 states, 200 steps, fastest of 3 runs)")
+        particle_cost = measure_cost(run_discrete_particle; samples = 3)
+        _print_cost("particle filter", particle_cost)
     else
-        throw(ArgumentError("pair must be :ekf, :ukf, :cut, or :srckf, got $pair"))
+        throw(ArgumentError("pair must be :ekf, :ukf, :cut, :srckf, or :particle, got $pair"))
     end
     println("On the two-body run the measured filters share the ODE propagation.")
     println("The linear kernel is the predict/update cost without that propagation.")

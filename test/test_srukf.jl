@@ -24,7 +24,12 @@ end
             beta = beta,
             kappa = 0.0,
         )
-        predict!(sr, (t, x, Δt) -> [x[1]^2], zeros(1, 1), 1.0)
+        predict!(
+            sr,
+            DiscreteDynamicsModel((t, x, Δt) -> [x[1]^2]; n = 1),
+            AdditiveProcessNoise(zeros(1, 1)),
+            1.0,
+        )
         @test sr.x[1] ≈ 1.0 atol = 1e-10
         @test covariance(sr)[1, 1] ≈ beta atol = 1e-8
         if beta > 0
@@ -36,7 +41,12 @@ end
     @test sr.alpha == 1e-3
     @test sr.beta == 2.0
     @test sr.kappa == 0.0
-    predict!(sr, (t, x, Δt) -> [x[1]^2], zeros(1, 1), 1.0)
+    predict!(
+        sr,
+        DiscreteDynamicsModel((t, x, Δt) -> [x[1]^2]; n = 1),
+        AdditiveProcessNoise(zeros(1, 1)),
+        1.0,
+    )
     @test sr.x[1] ≈ 1.0 atol = 1e-6
     @test covariance(sr)[1, 1] ≈ 2.0 atol = 1e-5
     spd_lower_factor(sr.S)
@@ -64,8 +74,10 @@ function compare_ukf_srukf(; F, H, Q, R, x0, P0, nsteps, seed, alpha = 1e-3)
     max_x = 0.0
     max_P = 0.0
     for k in 1:nsteps
-        predict!(ukf, f, Qm, 1.0)
-        predict!(sr, f, Qm, 1.0)
+        dynamics = DiscreteDynamicsModel(f; n = nx)
+        noise = AdditiveProcessNoise(Qm)
+        predict!(ukf, dynamics, noise, 1.0)
+        predict!(sr, dynamics, noise, 1.0)
         max_x = max(max_x, norm(sr.x .- ukf.x))
         max_P = max(max_P, norm(covariance(sr) .- ukf.P))
         @test sr.x ≈ ukf.x atol = 1e-6 rtol = 1e-6

@@ -71,6 +71,8 @@ w_j \leftarrow c_\ell w_j - s_\ell L_{j\ell}^{\mathrm{new}}, \qquad j > \ell.
 
 ``\sigma = -1`` is the downdate. The diagonal stays positive, or the step errors if the downdate would lose definiteness. The mean is ``x_{k:k-1}`` and time advances by ``\Delta t``.
 
+`predict!` takes a [`DynamicsModel`](@ref) and a [`ProcessNoiseModel`](@ref). ``Q`` is `get_noise(process_noise_model, Δt)`. The sigma points are propagated by [`EnsemblePropagation`](@ref). The default `ensemblealg` is [`EnsembleSerial`](@ref). Pass [`EnsembleThreads`](@ref), [`EnsembleDistributed`](@ref), or [`EnsembleSplitThreads`](@ref) to change the parallelism. The returned `ODESolution` stores `[x; vec(Φ)]`, and ``\Phi P_{\mathrm{start}} \Phi^\top`` is the unscented covariance before ``Q`` is added. The stored factor includes ``Q``.
+
 ## Update
 
 Redraw sigma points from ``\bigl(x_{k:k-1}, S_{k:k-1}\bigr)`` and set ``\gamma^{(i)} = h\bigl(t_k, \chi_{k:k-1}^{(i)}\bigr)``, ``\hat y_{k:k-1} = \sum W_m^{(i)} \gamma^{(i)}``. The innovation factor ``S_{y,k:k-1}`` is the same QR-and-downdate map applied to the measurement deviations and a factor of `R`:
@@ -144,19 +146,21 @@ For the optimal gain this matches ``P_{k:k-1} - K S_{y,k:k-1} S_{y,k:k-1}^\top K
 
 ## Two-body demo
 
-`demo/demo_srukf.jl` uses the EKF demo's two-body dynamics, initial condition, range and range-rate measurements, and noise. The plotted error is the estimate minus the truth. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``.
+`demo/demo_srukf.jl` uses the EKF demo's two-body dynamics, initial condition, range and range-rate measurements, and noise. The plotted error is the estimate minus the truth, sampled along the returned `ODESolution`. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``. The figure is `demo/twobody_srukf_errors.png`.
 
 ```julia
 using SequentialFilters
 
-include("twobody_scenario.jl")
-case = load_twobody_case()
-filt = SquareRootUnscentedKalmanFilter(0.0, case.x_hat0, case.P0)
-for k in 1:case.n_meas
-    predict!(filt, case.f, case.Q, case.Δt)
-    update!(filt, case.h, case.ys[k], case.R)
+filt = SquareRootUnscentedKalmanFilter(0.0, x_hat0, P0)
+dynamics = NonlinearODEModel(twobody!; n = n, p = μ)
+process_noise_model = UnbiasedRandomProcess(1.0e-6)
+for k in 1:n_meas
+    predict!(filt, dynamics, process_noise_model, Δt)
+    update!(filt, range_rangerate, ys[k], R)
 end
 ```
+
+The default `ensemblealg` is `EnsembleSerial()`. Pass `EnsembleThreads()`, `EnsembleDistributed()`, or `EnsembleSplitThreads()` to propagate the sigma points in parallel.
 
 The script prints elapsed time, process CPU time, and allocations for `UnscentedKalmanFilter` and this filter. The two-body pair propagates the same sigma points. The linear kernel is 5000 steps of a 6-state model with ``f(x) = Fx`` and no ODE, which is where the QR and downdate cost shows up next to the covariance-form sums.
 
@@ -179,7 +183,7 @@ H = [1.0 0.0]
 Q = [1.0e-3 0.0; 0.0 1.0e-3]
 R = [0.05;;]
 filt = SquareRootUnscentedKalmanFilter(0.0, [0.0, 1.0], Matrix{Float64}(I, 2, 2))
-predict!(filt, (t, x, Δt) -> F * x, Q, 1.0)
+predict!(filt, DiscreteDynamicsModel((t, x, Δt) -> F * x; n = 2), AdditiveProcessNoise(Q), 1.0)
 update!(filt, (t, x) -> H * x, [0.2], R)
 (filt.x, covariance(filt))
 ```

@@ -2,7 +2,7 @@
 Two-body demo case shared by the UKF and square-root demos.
 
 Constants, dynamics, sensor, noise, truth, and measurements match
-`demo/demo_twobody_ekf.jl`.
+`demo/demo_ekf.jl`.
 """
 
 using ForwardDiff

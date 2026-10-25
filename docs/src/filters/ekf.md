@@ -2,7 +2,7 @@
 
 `ExtendedKalmanFilter` stores the mean `x` and the covariance `P`. The predict step integrates continuous dynamics and a state-transition matrix. The update uses the measurement Jacobian and the Joseph form.
 
-The two-body demo is `demo/demo_twobody_ekf.jl`.
+The two-body demo is `demo/demo_ekf.jl`.
 
 ## Motivation
 
@@ -73,7 +73,7 @@ P_{k:k}
 
 ## Two-body demo
 
-The script below is the filter loop from `demo/demo_twobody_ekf.jl`. Dynamics, initial conditions, range and range-rate measurements, and the noise covariances are the shared two-body case. The figure records the estimation error, which is the estimate minus the truth, together with ``\pm 3\sqrt{P_{ii}}``.
+The script below is the filter loop from `demo/demo_ekf.jl`. Dynamics, initial conditions, range and range-rate measurements, and the noise covariances are the shared two-body case. The figure records the estimation error, which is the estimate minus the truth, together with ``\pm 3\sqrt{P_{ii}}``.
 
 ```julia
 using SequentialFilters
@@ -101,7 +101,7 @@ print_filter_costs(load_twobody_case(), :ekf)
 Run it with
 
 ```bash
-julia --project=demo demo/demo_twobody_ekf.jl
+julia --project=demo demo/demo_ekf.jl
 ```
 
 ## Same calls on a coasting state

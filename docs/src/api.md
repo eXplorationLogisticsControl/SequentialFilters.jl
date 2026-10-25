@@ -5,10 +5,17 @@
 ```@docs
 ProcessNoiseModel
 UnbiasedRandomProcess
+AdditiveProcessNoise
 get_noise
 DynamicsModel
 NonlinearODEModel
+DiscreteDynamicsModel
 propagate!
+EnsemblePropagation
+EnsembleSerial
+EnsembleThreads
+EnsembleDistributed
+EnsembleSplitThreads
 MeasurementModel
 NonlinearMeasurementModel
 ```
@@ -43,6 +50,13 @@ SquareRootUnscentedKalmanFilter
 SquareRootCubatureKalmanFilter
 cubature_points
 covariance
+```
+
+## Particle filter
+
+```@docs
+ParticleFilter
+resample!
 ```
 
 ```@docs

@@ -62,6 +62,8 @@ P_{k:k-1} = \sum_{i=0}^{2n} W_c^{(i)}
 
 ``P_{k:k-1}`` is symmetrized, and time advances by ``\Delta t``.
 
+`predict!` takes a [`DynamicsModel`](@ref) and a [`ProcessNoiseModel`](@ref). ``Q`` is `get_noise(process_noise_model, Δt)`. The sigma points are propagated by [`EnsemblePropagation`](@ref). The default `ensemblealg` is [`EnsembleSerial`](@ref), one point at a time. Pass [`EnsembleThreads`](@ref), [`EnsembleDistributed`](@ref), or [`EnsembleSplitThreads`](@ref) to change the parallelism. A [`NonlinearODEModel`](@ref) is one `EnsembleProblem`. A [`DiscreteDynamicsModel`](@ref) evaluates `f(t, x, Δt)` on each point. The returned `ODESolution` stores `[x; vec(Φ)]`, and ``\Phi P_{\mathrm{start}} \Phi^\top`` is the unscented covariance of the propagated points before ``Q`` is added. `filter.P` includes ``Q``.
+
 ## Update
 
 Sigma points are redrawn from the prior ``\bigl(x_{k:k-1}, P_{k:k-1}\bigr)`` and passed through ``h(t, x)``:
@@ -99,21 +101,23 @@ P_{k:k}
 
 ## Two-body demo
 
-`demo/demo_ukf.jl` uses the dynamics, initial mean and covariance, range and range-rate measurements, and noise from the EKF demo. `f` integrates the two-body ODE with the same state-transition propagation as `propagate!`, and `h` is the ground-station measurement. The figure is the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``.
+`demo/demo_ukf.jl` uses the dynamics, initial mean and covariance, range and range-rate measurements, and noise from the EKF demo. Each sigma point is one trajectory of a [`NonlinearODEModel`](@ref). The figure samples the returned `ODESolution` between measurements and draws the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``, using ``\Phi P_{\mathrm{start}} \Phi^\top`` from that solution. The endpoint covariance includes ``Q``.
 
 ```julia
 using SequentialFilters
 
-include("twobody_scenario.jl")
-case = load_twobody_case()
-ukf = UnscentedKalmanFilter(0.0, case.x_hat0, case.P0)
-for k in 1:case.n_meas
-    predict!(ukf, case.f, case.Q, case.Δt)
-    update!(ukf, case.h, case.ys[k], case.R)
+ukf = UnscentedKalmanFilter(0.0, x_hat0, P0)
+dynamics = NonlinearODEModel(twobody!; n = n, p = μ)
+process_noise_model = UnbiasedRandomProcess(1.0e-6)
+for k in 1:n_meas
+    predict!(ukf, dynamics, process_noise_model, Δt)
+    update!(ukf, range_rangerate, ys[k], R)
 end
 ```
 
-The same script then times this filter against the square-root UKF. Both two-body runs propagate every sigma point. The linear kernel repeats a 6-state, 2-measurement model for 5000 steps with ``f(x) = Fx`` and ``h(x) = Hx``, which is the predict/update cost without the ODE.
+Pass `ensemblealg = EnsembleThreads()` (or `EnsembleDistributed()`, `EnsembleSplitThreads()`) on `predict!` to run the sigma points in parallel. The default is `EnsembleSerial()`.
+
+The same script then times this filter against the square-root UKF. Both two-body runs propagate every sigma point. The linear kernel repeats a 6-state, 2-measurement model for 5000 steps with a [`DiscreteDynamicsModel`](@ref) `f(x) = Fx` and `h(x) = Hx`, which is the predict/update cost without the ODE.
 
 ```julia
 print_filter_costs(case, :ukf)
@@ -134,7 +138,7 @@ H = [1.0 0.0]
 Q = [1.0e-3 0.0; 0.0 1.0e-3]
 R = [0.05;;]
 ukf = UnscentedKalmanFilter(0.0, [0.0, 1.0], Matrix{Float64}(I, 2, 2))
-predict!(ukf, (t, x, Δt) -> F * x, Q, 1.0)
+predict!(ukf, DiscreteDynamicsModel((t, x, Δt) -> F * x; n = 2), AdditiveProcessNoise(Q), 1.0)
 update!(ukf, (t, x) -> H * x, [0.2], R)
 ukf.x
 ```

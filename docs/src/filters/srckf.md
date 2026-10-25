@@ -27,6 +27,8 @@ d^{(i)} = f(t, \chi^{(i)}, \Delta t) - \hat x.
 
 Let ``S_q`` satisfy ``Q = S_q S_q^\top``. The predicted factor is the thin QR of the columns ``\sqrt{1/(2n)}\, d^{(i)}`` together with the columns of ``S_q``. The stored factor is the sign-corrected ``R^\top``, the same QR path as a nonnegative-weight square-root CUT. No cubature weight is negative, so the predict does not downdate. The mean is ``\hat x`` and time advances by ``\Delta t``.
 
+`predict!` takes a [`DynamicsModel`](@ref) and a [`ProcessNoiseModel`](@ref). ``Q`` is `get_noise(process_noise_model, Δt)`. The ``2n`` cubature points are propagated by [`EnsemblePropagation`](@ref). The default `ensemblealg` is [`EnsembleSerial`](@ref). Pass [`EnsembleThreads`](@ref), [`EnsembleDistributed`](@ref), or [`EnsembleSplitThreads`](@ref) to change the parallelism. The returned `ODESolution` stores `[x; vec(Φ)]`, and ``\Phi P_{\mathrm{start}} \Phi^\top`` is the cubature covariance before ``Q`` is added.
+
 ## Update
 
 Redraw ``\chi^{(i)} = \hat x + S^- \xi^{(i)}`` and set ``\gamma^{(i)} = h(t, \chi^{(i)})``, ``\hat y = \sum_i w_i \gamma^{(i)}``. The innovation factor ``S_y`` is the same thin QR of the weighted measurement deviations and a factor of `R`. The cross-covariance is
@@ -47,19 +49,21 @@ and ``x \leftarrow x + K(y - \hat y)``. That is the additive update ``P - K S_y 
 
 ## Two-body demo
 
-`demo/demo_srckf.jl` uses the EKF demo's two-body dynamics, initial condition, range and range-rate measurements, and noise. The plotted error is the estimate minus the truth. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``. The figure is written to `demo/output/srckf_twobody_errors.png`.
+`demo/demo_srckf.jl` uses the EKF demo's two-body dynamics, initial condition, range and range-rate measurements, and noise. The plotted error is the estimate minus the truth, sampled along the returned `ODESolution`. Bands are ``\pm 3\sqrt{P_{ii}}`` with ``P = SS^\top``. The figure is written to `demo/twobody_srckf_errors.png`.
 
 ```julia
 using SequentialFilters
 
-include("twobody_scenario.jl")
-case = load_twobody_case()
-filt = SquareRootCubatureKalmanFilter(0.0, case.x_hat0, case.P0)
-for k in 1:case.n_meas
-    predict!(filt, case.f, case.Q, case.Δt)
-    update!(filt, case.h, case.ys[k], case.R)
+filt = SquareRootCubatureKalmanFilter(0.0, x_hat0, P0)
+dynamics = NonlinearODEModel(twobody!; n = n, p = μ)
+process_noise_model = UnbiasedRandomProcess(1.0e-6)
+for k in 1:n_meas
+    predict!(filt, dynamics, process_noise_model, Δt)
+    update!(filt, range_rangerate, ys[k], R)
 end
 ```
+
+The default `ensemblealg` is `EnsembleSerial()`. Pass `EnsembleThreads()`, `EnsembleDistributed()`, or `EnsembleSplitThreads()` to propagate the cubature points in parallel.
 
 The script prints elapsed time, process CPU time, and allocations for this filter. This package has no covariance-form cubature filter, so the demo does not print a square-root / covariance ratio. The linear kernel is 5000 steps of a 6-state model with ``f(x) = Fx`` and no ODE.
 
@@ -82,7 +86,7 @@ H = [1.0 0.0]
 Q = [1.0e-3 0.0; 0.0 1.0e-3]
 R = [0.05;;]
 filt = SquareRootCubatureKalmanFilter(0.0, [0.0, 1.0], Matrix{Float64}(I, 2, 2))
-predict!(filt, (t, x, Δt) -> F * x, Q, 1.0)
+predict!(filt, DiscreteDynamicsModel((t, x, Δt) -> F * x; n = 2), AdditiveProcessNoise(Q), 1.0)
 update!(filt, (t, x) -> H * x, [0.2], R)
 (filt.x, covariance(filt))
 ```

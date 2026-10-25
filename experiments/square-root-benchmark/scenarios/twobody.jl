@@ -1,7 +1,7 @@
 """
 Two-body range and range-rate scenario from the EKF demo.
 
-Orbit, sensor, and noise match `demo/demo_twobody_ekf.jl`:
+Orbit, sensor, and noise match `demo/demo_ekf.jl`:
 
   μ = 3.986004418e5 km³/s²,  R_E = 6378.137 km,
   ω_E = 7.292115146706979e-5 rad/s,  a = 7000 km,  inc = 51.6°,

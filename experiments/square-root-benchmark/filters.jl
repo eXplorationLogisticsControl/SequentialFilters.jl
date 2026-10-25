@@ -85,7 +85,7 @@ function package_filters()
         FilterSpec(
             "UKF",
             (t, x, P) -> SF.UnscentedKalmanFilter(t, x, P),
-            (filt, scenario) -> SF.predict!(filt, scenario.f, scenario.Q, scenario.Δt),
+            (filt, scenario) -> SF.predict!(filt, scenario.dynamics, scenario.process_noise, Float64(scenario.Δt)),
             (filt, scenario, y) -> _unscented_innovation(
                 filt.x, filt.P, scenario.h, filt.t, y, scenario.R;
                 alpha = filt.alpha, beta = filt.beta, kappa = filt.kappa,
@@ -97,7 +97,7 @@ function package_filters()
         FilterSpec(
             "SR-EKF",
             (t, x, P) -> SF.SquareRootExtendedKalmanFilter(t, x, P),
-            (filt, scenario) -> SF.predict!(filt, scenario.f_variational, scenario.F, scenario.Q, scenario.Δt),
+            (filt, scenario) -> SF.predict!(filt, scenario.dynamics, scenario.process_noise, Float64(scenario.Δt)),
             (filt, scenario, y) -> _linear_innovation(
                 filt.x, SF.covariance(filt), scenario.h, scenario.H, filt.t, y, scenario.R,
             ),
@@ -108,7 +108,7 @@ function package_filters()
         FilterSpec(
             "SR-UKF",
             (t, x, P) -> SF.SquareRootUnscentedKalmanFilter(t, x, P),
-            (filt, scenario) -> SF.predict!(filt, scenario.f, scenario.Q, scenario.Δt),
+            (filt, scenario) -> SF.predict!(filt, scenario.dynamics, scenario.process_noise, Float64(scenario.Δt)),
             (filt, scenario, y) -> _unscented_innovation(
                 filt.x, SF.covariance(filt), scenario.h, filt.t, y, scenario.R;
                 alpha = filt.alpha, beta = filt.beta, kappa = filt.kappa,
@@ -120,7 +120,7 @@ function package_filters()
         FilterSpec(
             "CUT",
             (t, x, P) -> SF.ConjugateUnscentedKalmanFilter(t, x, P; order = 4),
-            (filt, scenario) -> SF.predict!(filt, scenario.f, scenario.Q, scenario.Δt),
+            (filt, scenario) -> SF.predict!(filt, scenario.dynamics, scenario.process_noise, Float64(scenario.Δt)),
             (filt, scenario, y) -> _cut_innovation(
                 filt.x, filt.P, scenario.h, filt.t, y, scenario.R; order = filt.order,
             ),
@@ -131,7 +131,7 @@ function package_filters()
         FilterSpec(
             "SR-CUT",
             (t, x, P) -> SF.SquareRootConjugateUnscentedKalmanFilter(t, x, P; order = 4),
-            (filt, scenario) -> SF.predict!(filt, scenario.f, scenario.Q, scenario.Δt),
+            (filt, scenario) -> SF.predict!(filt, scenario.dynamics, scenario.process_noise, Float64(scenario.Δt)),
             (filt, scenario, y) -> _cut_innovation(
                 filt.x, SF.covariance(filt), scenario.h, filt.t, y, scenario.R; order = filt.order,
             ),
