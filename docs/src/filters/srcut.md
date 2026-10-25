@@ -1,4 +1,4 @@
-# [Square-root CUT](@id srcut-tutorial)
+# [Square-root CUT (SRCUT)](@id srcut-tutorial)
 
 `SquareRootConjugateUnscentedKalmanFilter` is the conjugate unscented Kalman filter with the covariance stored as a lower-triangular factor `S`,
 

@@ -1,4 +1,4 @@
-# [Square-root UKF](@id srukf-tutorial)
+# [Square-root UKF (SRUKF)](@id srukf-tutorial)
 
 `SquareRootUnscentedKalmanFilter` is the van der Merwe and Wan square-root unscented Kalman filter with additive noise. The covariance is a lower-triangular factor `S` with a positive diagonal and
 
@@ -43,7 +43,7 @@ x_{k:k-1} = \sum_{i=0}^{2n} W_m^{(i)}\, \chi_{k:k-1}^{(i)}, \qquad
 d^{(i)} = \chi_{k:k-1}^{(i)} - x_{k:k-1}.
 ```
 
-Let ``S_q`` satisfy ``Q = S_q S_q^\top``. Columns ``\sqrt{W_c^{(i)}}\, d^{(i)}`` with ``W_c^{(i)} > 0``, and the columns of ``S_q``, form the matrix whose thin QR becomes a lower factor ``S_{\mathrm{qr}}`` by the same sign-flip rule as the [Square-root EKF](@ref srekf-tutorial). Outer weights ``i \ge 1`` are required to be positive.
+Let ``S_q`` satisfy ``Q = S_q S_q^\top``. Columns ``\sqrt{W_c^{(i)}}\, d^{(i)}`` with ``W_c^{(i)} > 0``, and the columns of ``S_q``, form the matrix whose thin QR becomes a lower factor ``S_{\mathrm{qr}}`` by the same sign-flip rule as the [Square-root EKF (SREKF)](@ref srekf-tutorial). Outer weights ``i \ge 1`` are required to be positive.
 
 If ``W_c^{(0)} > 0``, the center column is included in that QR. If ``W_c^{(0)} < 0``, it is a rank-one downdate:
 

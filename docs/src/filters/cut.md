@@ -1,4 +1,4 @@
-# [Conjugate unscented filter](@id cut-tutorial)
+# [Conjugate unscented filter (CUT)](@id cut-tutorial)
 
 `ConjugateUnscentedKalmanFilter` is the conjugate unscented Kalman filter of Adurthi, Singla, and Singh, with additive process and measurement noise. It stores the mean `x` and the covariance `P`. No Jacobians are required.
 

@@ -21,12 +21,12 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Filters" => [
-            "Extended Kalman filter" => "tutorials/ekf.md",
-            "Unscented Kalman filter" => "tutorials/ukf.md",
-            "Conjugate unscented filter" => "tutorials/cut.md",
-            "Square-root EKF" => "tutorials/srekf.md",
-            "Square-root UKF" => "tutorials/srukf.md",
-            "Square-root CUT" => "tutorials/srcut.md",
+            "Extended Kalman filter (EKF)" => "filters/ekf.md",
+            "Unscented Kalman filter (UKF)" => "filters/ukf.md",
+            "Conjugate unscented filter (CUT)" => "filters/cut.md",
+            "Square-root EKF (SREKF)" => "filters/srekf.md",
+            "Square-root UKF (SRUKF)" => "filters/srukf.md",
+            "Square-root CUT (SRCUT)" => "filters/srcut.md",
         ],
         "API" => "api.md",
     ],

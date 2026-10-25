@@ -1,4 +1,4 @@
-# [Unscented Kalman filter](@id ukf-tutorial)
+# [Unscented Kalman filter (UKF)](@id ukf-tutorial)
 
 `UnscentedKalmanFilter` is the scaled unscented Kalman filter of Wan and van der Merwe, with additive process and measurement noise. It stores the mean `x` and the covariance `P`. No Jacobians are required.
 

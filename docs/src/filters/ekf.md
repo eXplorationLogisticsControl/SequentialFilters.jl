@@ -1,4 +1,4 @@
-# [Extended Kalman filter](@id ekf-tutorial)
+# [Extended Kalman filter (EKF)](@id ekf-tutorial)
 
 `ExtendedKalmanFilter` stores the mean `x` and the covariance `P`. The predict step integrates continuous dynamics and a state-transition matrix. The update uses the measurement Jacobian and the Joseph form.
 
