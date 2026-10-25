@@ -30,3 +30,6 @@ JuliaLocalPreferences.toml
 
 # Conda environment and metadata created in the project directory by the CondaPkg package
 .CondaPkg/
+
+# Monte Carlo figures and tables from experiments/run_twobody.jl
+experiments/output/

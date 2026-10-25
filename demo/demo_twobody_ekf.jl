@@ -1,4 +1,9 @@
-"""Demo with two-body dynamics using EKF"""
+"""
+Demo with two-body dynamics using the extended Kalman filter.
+
+The script saves the error figure and then prints elapsed time, process CPU
+time, and allocations for the EKF and the square-root EKF on this scenario.
+"""
 
 
 import Pkg
@@ -11,6 +16,8 @@ using OrdinaryDiffEq
 using Random
 
 using SequentialFilters
+
+import SequentialFilters: predict!, update!
 
 μ = 3.986004418e5
 R_E = 6378.137
@@ -180,3 +187,7 @@ println("saved $(outfile)")
 x_true = truth(n_meas * Δt)
 println("final position error $(norm(ekf.x[1:3] .- x_true[1:3])) km")
 println("final velocity error $(norm(ekf.x[4:6] .- x_true[4:6])) km/s")
+
+include(joinpath(@__DIR__, "twobody_scenario.jl"))
+include(joinpath(@__DIR__, "benchmark_filters.jl"))
+print_filter_costs(load_twobody_case(), :ekf)

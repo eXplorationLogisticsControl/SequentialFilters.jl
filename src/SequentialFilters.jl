@@ -8,11 +8,23 @@ include("dynamics.jl")
 include("measurement.jl")
 include("ekf.jl")
 include("ukf.jl")
+include("srekf.jl")
+include("srukf.jl")
+include("cut.jl")
+include("srcut.jl")
+include("diagnosis.jl")
 
 export ProcessNoiseModel, UnbiasedRandomProcess, get_noise
 export DynamicsModel, NonlinearODEModel, propagate!
 export MeasurementModel, NonlinearMeasurementModel
 export ExtendedKalmanFilter, predict!, update!
 export UnscentedKalmanFilter, get_sigma_points, unscented_weights
+export SquareRootExtendedKalmanFilter, SquareRootUnscentedKalmanFilter, covariance
+export ConjugateUnscentedKalmanFilter, cut_points
+export SquareRootConjugateUnscentedKalmanFilter
+export estimation_error, rmse, block_rmse, time_averaged_rmse
+export nees, averaged_nees, nis, averaged_nis
+export innovation_autocorrelation, whiteness_bound
+export is_diverged, divergence_rate, mahalanobis
 
 end # module SequentialFilters

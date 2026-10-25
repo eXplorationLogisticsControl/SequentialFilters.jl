@@ -1,0 +1,10 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+SequentialFilters = "f2989da4-8834-438a-a567-aef86a75e79e"
+
+[sources]
+SequentialFilters = {path = ".."}
+
+[compat]
+Documenter = "1"
+SequentialFilters = "0.1"

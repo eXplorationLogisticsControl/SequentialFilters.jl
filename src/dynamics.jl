@@ -1,8 +1,18 @@
-"""Dynamics model struct"""
+"""
+Process-noise model.
 
+`get_noise(model, Δt)` is the discrete covariance added over a step of length `Δt`.
+"""
 abstract type ProcessNoiseModel end
 
 
+"""
+    UnbiasedRandomProcess(σp)
+
+White-acceleration process noise for a 6-state position/velocity model.
+
+`σp` is the acceleration scale. `get_noise` returns the matching discrete covariance.
+"""
 mutable struct UnbiasedRandomProcess <: ProcessNoiseModel
     σp::Float64
 
@@ -12,6 +22,19 @@ mutable struct UnbiasedRandomProcess <: ProcessNoiseModel
 end
 
 
+"""
+    get_noise(model::UnbiasedRandomProcess, Δt::Float64)
+
+Discrete process-noise covariance over an interval of length `Δt`:
+
+```math
+Q = \\sigma_p^2
+\\begin{bmatrix}
+(\\Delta t^3/3) I_3 & (\\Delta t^2/2) I_3 \\\\
+(\\Delta t^2/2) I_3 & \\Delta t\\, I_3
+\\end{bmatrix}.
+```
+"""
 function get_noise(noise_model::UnbiasedRandomProcess, Δt::Float64)
     return noise_model.σp^2 * [
         Δt^3/3 * I(3) Δt^2/2 * I(3)
@@ -20,6 +43,7 @@ function get_noise(noise_model::UnbiasedRandomProcess, Δt::Float64)
 end
 
 
+"""Continuous-time dynamics integrated over one filter predict step."""
 abstract type DynamicsModel end
 
 """
