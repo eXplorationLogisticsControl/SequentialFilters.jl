@@ -14,3 +14,11 @@
 
 Sequential filters for nonlinear state estimation: an extended Kalman filter, a scaled unscented Kalman filter, and square-root forms of both.
 
+### TODO
+
+- [ ] Higher-order unscented Kalman estimators (HOUSE) variants
+- [ ] Particle filters (parallelization via `EnsembleProblem`)
+- [ ] Gaussian mixture filters
+- [ ] Filters with consider parameters
+  - [ ] Unscented Schmidt-Kalman filter (USKF), Zanetti and Demars, 2013, Stauch and Jah, 2015.
+  - [ ] Square-root unscented Schmidt-Kalman filter (SRUSKF), Geeraert and McMahon 2018.
