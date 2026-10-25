@@ -12,6 +12,7 @@ include("ukf.jl")
 include("ensemble.jl")
 include("ekf.jl")
 include("cut.jl")
+include("house.jl")
 include("srekf.jl")
 include("srukf.jl")
 include("srcut.jl")
@@ -26,6 +27,7 @@ export MeasurementModel, NonlinearMeasurementModel
 export ExtendedKalmanFilter, predict!, update!
 export UnscentedKalmanFilter, get_sigma_points, unscented_weights
 export ConjugateUnscentedKalmanFilter, cut_points
+export HigherOrderUnscentedEstimator, house_sigma_points
 export SquareRootExtendedKalmanFilter, SquareRootUnscentedKalmanFilter, covariance
 export SquareRootConjugateUnscentedKalmanFilter
 export SquareRootCubatureKalmanFilter, cubature_points
