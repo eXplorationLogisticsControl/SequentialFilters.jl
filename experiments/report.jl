@@ -128,7 +128,7 @@ function _legend_elements(names; bound::Bool = false, crlb::Bool = false)
         push!(labels, name)
     end
     if crlb
-        push!(elements, LineElement(color = :gray28, linestyle = :dot, linewidth = 2.2))
+        push!(elements, PolyElement(color = (:red, 0.5)))
         push!(labels, "PCRLB")
     end
     if bound
@@ -144,6 +144,9 @@ function save_rmse_figure(path, scenario, results, position_bound, velocity_boun
     fig = Figure(size = (980, 760))
     position_axis = Axis(fig[1, 1]; ylabel = "position RMSE (km)", xlabel = "time (min)")
     velocity_axis = Axis(fig[2, 1]; ylabel = "velocity RMSE (km/s)", xlabel = "time (min)")
+    zeros_time = zeros(length(minutes))
+    band!(position_axis, minutes, zeros_time, position_bound; color = :red, alpha = 0.5)
+    band!(velocity_axis, minutes, zeros_time, velocity_bound; color = :red, alpha = 0.5)
     for result in results
         style = _style(result.name)
         position = SequentialFilters.block_rmse(result.errors, scenario.blocks.position)
@@ -151,8 +154,6 @@ function save_rmse_figure(path, scenario, results, position_bound, velocity_boun
         lines!(position_axis, minutes, position; color = style.color, linestyle = style.linestyle, linewidth = 1.8)
         lines!(velocity_axis, minutes, velocity; color = style.color, linestyle = style.linestyle, linewidth = 1.8)
     end
-    lines!(position_axis, minutes, position_bound; color = :gray28, linestyle = :dot, linewidth = 2.2)
-    lines!(velocity_axis, minutes, velocity_bound; color = :gray28, linestyle = :dot, linewidth = 2.2)
     elements, labels = _legend_elements([result.name for result in results]; crlb = true)
     Legend(fig[1:2, 2], elements, labels; framevisible = false, tellheight = false)
     Label(fig[0, 1:2], "Two-body RMSE and posterior CRLB"; fontsize = 16)
