@@ -1,0 +1,20 @@
+[deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SequentialFilters = "f2989da4-8834-438a-a567-aef86a75e79e"
+
+[sources]
+SequentialFilters = {path = ".."}
+
+[compat]
+CairoMakie = "0.15"
+ForwardDiff = "1.4.6"
+LinearAlgebra = "1.11"
+OrdinaryDiffEq = "7.8.1"
+Printf = "1.11"
+Random = "1.11"
+SequentialFilters = "0.1"
