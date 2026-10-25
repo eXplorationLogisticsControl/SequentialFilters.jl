@@ -718,7 +718,12 @@ function run_illcond(spec::BenchFilter, draws, σ_position)
             P = filter_covariance(filt)
             store_epoch!(errors, nees_hist, conds, i, 1, draw.truth[:, 1], xhat, P, 1:2)
             for k in 1:ILL_STEPS
-                SequentialFilters.predict!(filt, f, Q, ILL_DT)
+                SequentialFilters.predict!(
+                    filt,
+                    SequentialFilters.DiscreteDynamicsModel(f; n = nx),
+                    SequentialFilters.AdditiveProcessNoise(Q),
+                    Float64(ILL_DT),
+                )
                 SequentialFilters.update!(filt, h, draw.ys[k], R)
                 xhat = filter_mean(filt)
                 P = filter_covariance(filt)
@@ -788,7 +793,12 @@ function run_orbit(spec::BenchFilter, case::OrbitCase, draws)
             stopped = false
             for (k, step) in enumerate(case.steps)
                 Q = discrete_process_covariance(step.dt)
-                SequentialFilters.predict!(filt, f, Q, step.dt)
+                SequentialFilters.predict!(
+                    filt,
+                    SequentialFilters.DiscreteDynamicsModel(f; n = nx),
+                    SequentialFilters.AdditiveProcessNoise(Q),
+                    Float64(step.dt),
+                )
                 xhat = filter_mean(filt)
                 P = filter_covariance(filt)
                 if !(all(isfinite, xhat) && all(isfinite, P)) ||

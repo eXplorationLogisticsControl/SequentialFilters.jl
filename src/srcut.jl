@@ -68,36 +68,47 @@ end
 
 
 """
-    predict!(filter::SquareRootConjugateUnscentedKalmanFilter, f, Q, Δt)
+    predict!(filter::SquareRootConjugateUnscentedKalmanFilter, dynamics_model::DynamicsModel, process_noise_model::ProcessNoiseModel, Δt::Float64; save_everystep=false, saveat=(), ensemblealg=EnsembleSerial())
 
-`f(t, x, Δt)` is the noise-free process model. `Q` is the additive
-process-noise covariance. Sigma points are `x + S ξ`, where `ξ` and the
-weights are `cut_points(n; order)`. `filter.t` advances by `Δt`.
+Propagate `x + S ξ` with [`EnsemblePropagation`](@ref) and rebuild `S` from
+the CUT weights and `Q = get_noise(process_noise_model, Δt)`.
+
+The default `ensemblealg` is [`EnsembleSerial`](@ref). The returned
+`ODESolution` stores `[μ; vec(Φ)]` for the noise-free cubature covariance.
 """
-function predict!(filter::SquareRootConjugateUnscentedKalmanFilter, f, Q, Δt::Real)
+function predict!(
+    filter::SquareRootConjugateUnscentedKalmanFilter,
+    dynamics_model::DynamicsModel,
+    process_noise_model::ProcessNoiseModel,
+    Δt::Float64;
+    save_everystep::Bool = false,
+    saveat = (),
+    ensemblealg = EnsembleSerial(),
+)
+    _check_step(Δt)
     T = eltype(filter.x)
     nx = filter.nx
-    Qm = _as_eltype(_square_matrix(Q, nx, "Q"), T)
-    ΔtT = T(Δt)
-    isfinite(ΔtT) || throw(ArgumentError("Δt must be finite, got $Δt"))
-    t = filter.t
+    Qm = _as_eltype(_square_matrix(get_noise(process_noise_model, Δt), nx, "Q"), T)
     X, w = _srcut_sigma_points(filter)
-    Xprop = Matrix{T}(undef, nx, size(X, 2))
-    for i in axes(X, 2)
-        xi = f(t, X[:, i], ΔtT)
-        length(xi) == nx || throw(
-            DimensionMismatch("f returned length $(length(xi)); expected $nx"),
-        )
-        for j in 1:nx
-            Xprop[j, i] = xi[j]
-        end
-    end
+    P_start = Matrix{Float64}(covariance(filter))
+    Xprop, sol = _cloud_predict(
+        dynamics_model,
+        X,
+        P_start,
+        w,
+        w,
+        Float64(filter.t),
+        Δt;
+        ensemblealg = ensemblealg,
+        save_everystep = save_everystep,
+        saveat = saveat,
+    )
     μ = _weighted_column_mean(Xprop, w)
     Snew = _srcut_factor(_column_deviations(Xprop, μ), w, _noise_factor(Qm))
     filter.x .= μ
     filter.S .= Snew
-    filter.t = t + ΔtT
-    return nothing
+    filter.t = T(filter.t + Δt)
+    return sol
 end
 
 

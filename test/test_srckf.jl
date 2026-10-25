@@ -44,7 +44,7 @@ end
     x_upd = x_pred + vec(K * (y .- H * x_pred))
     P_upd = Symmetric(Matrix(P_pred) - K * S * K')
     filt = SquareRootCubatureKalmanFilter(0.0, x0, P0)
-    predict!(filt, (t, x, dt) -> F * x, Q, 0.2)
+    predict!(filt, DiscreteDynamicsModel((t, x, dt) -> F * x; n = 2), AdditiveProcessNoise(Q), 0.2)
     @test filt.t ≈ 0.2
     @test filt.x ≈ x_pred atol = 1e-12
     @test covariance(filt) ≈ P_pred atol = 1e-12
@@ -57,7 +57,12 @@ end
     P32 = Matrix{Float32}(I, 2, 2)
     sr32 = SquareRootCubatureKalmanFilter(0.0, x32, P32)
     @test eltype(sr32.S) == Float32
-    predict!(sr32, (t, x, dt) -> Float32[1 0.2; 0 1] * x, 0.05f0 * Matrix{Float32}(I, 2, 2), 1.0f0)
+    predict!(
+        sr32,
+        DiscreteDynamicsModel((t, x, dt) -> Float32[1 0.2; 0 1] * x; n = 2),
+        AdditiveProcessNoise(0.05f0 * Matrix{Float32}(I, 2, 2)),
+        1.0,
+    )
     @test eltype(sr32.x) == Float32
     @test all(isfinite, sr32.x)
     spd_lower_factor(Matrix{Float64}(sr32.S))

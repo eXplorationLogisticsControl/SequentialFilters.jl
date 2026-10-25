@@ -60,35 +60,48 @@ end
 
 
 """
-    predict!(filter::SquareRootUnscentedKalmanFilter, f, Q, Δt)
+    predict!(filter::SquareRootUnscentedKalmanFilter, dynamics_model::DynamicsModel, process_noise_model::ProcessNoiseModel, Δt::Float64; save_everystep=false, saveat=(), ensemblealg=EnsembleSerial())
 
-`f(t, x, Δt)` is the noise-free process model. `Q` is the additive
-process-noise covariance. `filter.t` advances by `Δt`.
+Propagate the sigma points with [`EnsemblePropagation`](@ref). The predicted
+factor is the same QR and center-weight downdate as before, with
+`Q = get_noise(process_noise_model, Δt)`.
+
+The default `ensemblealg` is [`EnsembleSerial`](@ref). The returned
+`ODESolution` stores `[μ; vec(Φ)]` for the noise-free unscented covariance.
 """
-function predict!(filter::SquareRootUnscentedKalmanFilter, f, Q, Δt::Real)
+function predict!(
+    filter::SquareRootUnscentedKalmanFilter,
+    dynamics_model::DynamicsModel,
+    process_noise_model::ProcessNoiseModel,
+    Δt::Float64;
+    save_everystep::Bool = false,
+    saveat = (),
+    ensemblealg = EnsembleSerial(),
+)
+    _check_step(Δt)
     nx = filter.nx
-    Qm = _square_matrix(Q, nx, "Q")
-    Δt64 = Float64(Δt)
-    isfinite(Δt64) || throw(ArgumentError("Δt must be finite, got $Δt"))
-    t = filter.t
+    Qm = _square_matrix(get_noise(process_noise_model, Δt), nx, "Q")
     weights = _srukf_weights(filter)
     X = _sigma_points_from_factor(filter.x, filter.S, sqrt(nx + weights.lambda))
-    Xprop = Matrix{Float64}(undef, nx, size(X, 2))
-    for i in axes(X, 2)
-        xi = f(t, X[:, i], Δt64)
-        length(xi) == nx || throw(
-            DimensionMismatch("f returned length $(length(xi)); expected $nx"),
-        )
-        for j in 1:nx
-            Xprop[j, i] = xi[j]
-        end
-    end
+    P_start = covariance(filter)
+    Xprop, sol = _cloud_predict(
+        dynamics_model,
+        X,
+        P_start,
+        weights.Wm,
+        weights.Wc,
+        filter.t,
+        Δt;
+        ensemblealg = ensemblealg,
+        save_everystep = save_everystep,
+        saveat = saveat,
+    )
     μ = _weighted_column_mean(Xprop, weights.Wm)
     Snew = _sr_factor(_column_deviations(Xprop, μ), weights.Wc, _noise_factor(Qm))
     filter.x .= μ
     filter.S .= Snew
-    filter.t = t + Δt64
-    return nothing
+    filter.t = filter.t + Δt
+    return sol
 end
 
 

@@ -175,18 +175,28 @@ end
     @test filt.P[1, 1] == 2.0
     @test filt.nx == 2
     @test filt.order == 4
-    @test_throws ArgumentError predict!(filt, (t, z, dt) -> z, Matrix{Float64}(I, 2, 2), NaN)
+    @test_throws ArgumentError predict!(
+        filt,
+        DiscreteDynamicsModel((t, z, dt) -> z; n = 2),
+        AdditiveProcessNoise(Matrix{Float64}(I, 2, 2)),
+        NaN,
+    )
     @test filt.t == 1.5
     @test filt.x == [1.0, -2.0]
     @test_throws DimensionMismatch predict!(
         filt,
-        (t, z, dt) -> [z[1]],
-        Matrix{Float64}(I, 2, 2),
+        DiscreteDynamicsModel((t, z, dt) -> [z[1]]; n = 2),
+        AdditiveProcessNoise(Matrix{Float64}(I, 2, 2)),
         0.1,
     )
     @test filt.t == 1.5
     bad = ConjugateUnscentedKalmanFilter(0.0, [0.0], [-1.0;;])
-    @test_throws ArgumentError predict!(bad, (t, z, dt) -> z, [1.0;;], 0.1)
+    @test_throws ArgumentError predict!(
+        bad,
+        DiscreteDynamicsModel((t, z, dt) -> z; n = 1),
+        AdditiveProcessNoise([1.0;;]),
+        0.1,
+    )
     @test bad.t == 0.0
     @test bad.x == [0.0]
 end
@@ -207,7 +217,12 @@ end
     P_upd = Symmetric(P_pred - K * S * K')
     for (order, atol) in ((4, 1e-10), (6, 1e-6))
         filt = ConjugateUnscentedKalmanFilter(0.0, x0, P0; order = order)
-        predict!(filt, (t, x, dt) -> F * x, Q, 0.2)
+        predict!(
+            filt,
+            DiscreteDynamicsModel((t, x, dt) -> F * x; n = 2),
+            AdditiveProcessNoise(Q),
+            0.2,
+        )
         @test filt.t ≈ 0.2
         @test filt.x ≈ x_pred atol = atol
         @test Symmetric(filt.P) ≈ P_pred atol = atol
@@ -219,7 +234,12 @@ end
     end
 
     filt1 = ConjugateUnscentedKalmanFilter(0.0, [2.0], fill(0.4, 1, 1); order = 4)
-    predict!(filt1, (t, x, dt) -> 0.5 .* x .+ 1.0, fill(0.1, 1, 1), 1.0)
+    predict!(
+        filt1,
+        DiscreteDynamicsModel((t, x, dt) -> 0.5 .* x .+ 1.0; n = 1),
+        AdditiveProcessNoise(fill(0.1, 1, 1)),
+        1.0,
+    )
     @test filt1.x ≈ [2.0] atol = 1e-12
     @test filt1.P ≈ fill(0.2, 1, 1) atol = 1e-12
 end
@@ -293,25 +313,15 @@ end
     σ_v = 1.0e-3
     x_hat0 = x0 .+ [1.0, -0.5, 0.8, 1.0e-3, -0.5e-3, 0.7e-3]
     P0 = Matrix(Diagonal([fill(σ_r^2, 3); fill(σ_v^2, 3)]))
-    Q = get_noise(UnbiasedRandomProcess(1.0e-6), Δt)
-
-    function f(t, x, dt)
-        sol = solve(
-            ODEProblem(twobody!, x, (t, t + dt), μ),
-            Tsit5();
-            reltol = 1e-12,
-            abstol = 1e-12,
-            save_everystep = false,
-        )
-        return sol.u[end]
-    end
+    dynamics = NonlinearODEModel(twobody!; n = 6, p = μ)
+    noise = UnbiasedRandomProcess(1.0e-6)
     h(t, x) = range_rangerate(t, x)
 
     function run!(filt, nsteps)
         pos = Float64[]
         vel = Float64[]
         for k in 1:nsteps
-            predict!(filt, f, Q, Δt)
+            predict!(filt, dynamics, noise, Δt)
             update!(filt, h, ys[k], R)
             @test issymmetric(filt.P)
             @test all(>(0), eigvals(Symmetric(filt.P)))

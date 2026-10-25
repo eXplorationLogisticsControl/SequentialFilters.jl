@@ -21,7 +21,8 @@ of `P` (`P = L Lᵀ`) and `ξ` are the standard-normal CUT points returned by
 `cut_points`. The filter stores `P` itself. Each point carries one
 cubature weight, and that same weight is used for the mean and the covariance.
 
-`f` and `h` passed to `predict!` and `update!` are noise-free. `Q` and `R`
+`predict!` propagates the sigma points through a [`DynamicsModel`](@ref) with
+[`EnsemblePropagation`](@ref). `update!` takes a noise-free `h`. `Q` and `R`
 are added after the cubature. No Jacobians are required.
 
 The constructor copies `x` and `P`. Fields `t`, `x`, and `P` are the current
@@ -117,42 +118,50 @@ end
 
 
 """
-    predict!(filter::ConjugateUnscentedKalmanFilter, f, Q, Δt)
+    predict!(filter::ConjugateUnscentedKalmanFilter, dynamics_model::DynamicsModel, process_noise_model::ProcessNoiseModel, Δt::Float64; save_everystep=false, saveat=(), ensemblealg=EnsembleSerial())
 
-Discrete-time prediction with additive process noise.
+Propagate the CUT points with [`EnsemblePropagation`](@ref) and add
+`Q = get_noise(process_noise_model, Δt)`.
 
-`f(t, x, Δt)` is the noise-free process model and must return a vector of
-length `filter.nx`. Each current sigma point is passed through `f`. The
-predicted mean and covariance are the CUT cubature moments, and `Q` is added
-to the covariance. `filter.t` advances by `Δt`.
-
-`Q` is an `nx × nx` covariance (`Matrix` or `Diagonal`). Derivatives of `f`
-are not used.
+The default `ensemblealg` is [`EnsembleSerial`](@ref). Pass
+[`EnsembleThreads`](@ref), [`EnsembleDistributed`](@ref), or
+[`EnsembleSplitThreads`](@ref) to run the points in parallel. The returned
+`ODESolution` stores `[μ; vec(Φ)]`, with `Φ P_start Φᵀ` the cubature
+covariance before `Q` is added. `filter.P` includes `Q`.
 """
-function predict!(filter::ConjugateUnscentedKalmanFilter, f, Q, Δt::Real)
+function predict!(
+    filter::ConjugateUnscentedKalmanFilter,
+    dynamics_model::DynamicsModel,
+    process_noise_model::ProcessNoiseModel,
+    Δt::Float64;
+    save_everystep::Bool = false,
+    saveat = (),
+    ensemblealg = EnsembleSerial(),
+)
+    _check_step(Δt)
     T = eltype(filter.x)
     nx = filter.nx
-    Qm = _as_eltype(_square_matrix(Q, nx, "Q"), T)
-    ΔtT = T(Δt)
-    isfinite(ΔtT) || throw(ArgumentError("Δt must be finite, got $Δt"))
-    t = filter.t
+    Qm = _as_eltype(_square_matrix(get_noise(process_noise_model, Δt), nx, "Q"), T)
     X, w = _cut_sigma_points(filter)
-    Xprop = Matrix{T}(undef, nx, size(X, 2))
-    for i in axes(X, 2)
-        xi = f(t, X[:, i], ΔtT)
-        length(xi) == nx || throw(
-            DimensionMismatch("f returned length $(length(xi)); expected $nx"),
-        )
-        for j in 1:nx
-            Xprop[j, i] = xi[j]
-        end
-    end
+    P_start = Matrix{Float64}(filter.P)
+    Xprop, sol = _cloud_predict(
+        dynamics_model,
+        X,
+        P_start,
+        w,
+        w,
+        Float64(filter.t),
+        Δt;
+        ensemblealg = ensemblealg,
+        save_everystep = save_everystep,
+        saveat = saveat,
+    )
     μ = _weighted_column_mean(Xprop, w)
     P = _deviation_covariance(Xprop, μ, w) + Qm
     filter.x .= μ
     filter.P .= _symmetrize(P)
-    filter.t = t + ΔtT
-    return nothing
+    filter.t = T(filter.t + Δt)
+    return sol
 end
 
 

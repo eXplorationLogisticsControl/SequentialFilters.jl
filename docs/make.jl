@@ -20,6 +20,9 @@ makedocs(;
     checkdocs = :exports,
     pages = [
         "Home" => "index.md",
+        "Tutorials" => [
+            "Two-body orbit" => "tutorials/basic.md",
+        ],
         "Filters" => [
             "Extended Kalman filter (EKF)" => "filters/ekf.md",
             "Unscented Kalman filter (UKF)" => "filters/ukf.md",
@@ -28,6 +31,7 @@ makedocs(;
             "Square-root UKF (SRUKF)" => "filters/srukf.md",
             "Square-root CUT (SRCUT)" => "filters/srcut.md",
             "Square-root CKF (SRCKF)" => "filters/srckf.md",
+            "Bootstrap particle filter (PF)" => "filters/pf.md",
         ],
         "API" => "api.md",
     ],

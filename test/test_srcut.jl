@@ -49,8 +49,10 @@ function compare_cut_srcut(; F, H, Q, R, x0, P0, nsteps, seed, order, y_atol)
     max_x = 0.0
     max_P = 0.0
     for k in 1:nsteps
-        predict!(cut, f, Qm, 1.0)
-        predict!(sr, f, Qm, 1.0)
+        dynamics = DiscreteDynamicsModel(f; n = nx)
+        noise = AdditiveProcessNoise(Qm)
+        predict!(cut, dynamics, noise, 1.0)
+        predict!(sr, dynamics, noise, 1.0)
         max_x = max(max_x, norm(sr.x .- cut.x))
         max_P = max(max_P, norm(covariance(sr) .- cut.P))
         @test sr.x ≈ cut.x atol = y_atol rtol = y_atol
@@ -187,8 +189,10 @@ end
         @test eltype(sr.S) == Float32
         f = (t, z, dt) -> F * z
         h = (t, z) -> H * z
-        predict!(cut, f, Q, 1.0f0)
-        predict!(sr, f, Q, 1.0f0)
+        dynamics = DiscreteDynamicsModel(f; n = 2)
+        noise = AdditiveProcessNoise(Q)
+        predict!(cut, dynamics, noise, 1.0)
+        predict!(sr, dynamics, noise, 1.0)
         update!(cut, h, y, R)
         update!(sr, h, y, R)
         @test eltype(cut.P) == Float32

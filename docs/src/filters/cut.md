@@ -2,7 +2,7 @@
 
 `ConjugateUnscentedKalmanFilter` is the conjugate unscented Kalman filter of Adurthi, Singla, and Singh, with additive process and measurement noise. It stores the mean `x` and the covariance `P`. No Jacobians are required.
 
-Sigma points and weights come from [`cut_points`](@ref). The default `order` is `4`. CUT4 is defined for every state dimension `n ≥ 1`. CUT6 is defined for `2 ≤ n ≤ 9`. Order 8 is not implemented. Each point carries one weight, and that same weight is used for the mean and the covariance. On the supported dimensions the weights are nonnegative. The two-body demo is `demo/demo_cut.jl` and uses order 4.
+Sigma points and weights come from [`cut_points`](@ref). The default `order` is `4`. CUT4 is defined for every state dimension `n ≥ 1`. CUT6 is defined for `2 ≤ n ≤ 9`. Order 8 is not implemented. Each point carries one weight, and that same weight is used for the mean and the covariance. On the supported dimensions the weights are nonnegative. The two-body demo is `demo/twobody/demo_cut.jl` and uses order 4.
 
 ## Motivation
 
@@ -18,81 +18,85 @@ Use CUT when the UKF's ``2n+1`` points are not enough and a particle filter is m
 
 ## Prediction
 
-Let ``(\xi^{(i)}, w_i)`` be the standard-normal CUT points, and let ``L`` be the lower Cholesky factor ``P_{k-1:k-1} = LL^\top``. The filter points are
+Let ``(\xi^{(i)}, w_i)`` be the standard-normal CUT points, and let ``L`` be the lower Cholesky factor ``P_{k-1|k-1} = LL^\top``. The filter points are
 
 ```math
-\chi_{k-1:k-1}^{(i)} = x_{k-1:k-1} + L \xi^{(i)}.
+\chi_{k-1|k-1}^{(i)} = x_{k-1|k-1} + L \xi^{(i)}.
 ```
 
 Pass each point through the noise-free model ``f(t, x, \Delta t)``:
 
 ```math
-x_{k:k-1} = \sum_i w_i\, f\bigl(t_{k-1}, \chi_{k-1:k-1}^{(i)}, \Delta t\bigr),
+x_{k|k-1} = \sum_i w_i\, f\bigl(t_{k-1}, \chi_{k-1|k-1}^{(i)}, \Delta t\bigr),
 ```
 
 ```math
-P_{k:k-1} = \sum_i w_i
-\big(f\bigl(t_{k-1}, \chi_{k-1:k-1}^{(i)}, \Delta t\bigr) - x_{k:k-1}\big)
-\big(f\bigl(t_{k-1}, \chi_{k-1:k-1}^{(i)}, \Delta t\bigr) - x_{k:k-1}\big)^\top + Q.
+P_{k|k-1} = \sum_i w_i
+\big(f\bigl(t_{k-1}, \chi_{k-1|k-1}^{(i)}, \Delta t\bigr) - x_{k|k-1}\big)
+\big(f\bigl(t_{k-1}, \chi_{k-1|k-1}^{(i)}, \Delta t\bigr) - x_{k|k-1}\big)^\top + Q.
 ```
 
-``P_{k:k-1}`` is symmetrized, and time advances by ``\Delta t``. A zero weight adds nothing. For CUT4 with `n ≥ 3` the center weight is zero, and that point is omitted.
+``P_{k|k-1}`` is symmetrized, and time advances by ``\Delta t``. A zero weight adds nothing. For CUT4 with `n ≥ 3` the center weight is zero, and that point is omitted.
+
+`predict!` takes a [`DynamicsModel`](@ref) and a [`ProcessNoiseModel`](@ref). ``Q`` is `get_noise(process_noise_model, Δt)`. The CUT points are propagated by [`EnsemblePropagation`](@ref). The default `ensemblealg` is [`EnsembleSerial`](@ref). Pass [`EnsembleThreads`](@ref), [`EnsembleDistributed`](@ref), or [`EnsembleSplitThreads`](@ref) to change the parallelism. A [`NonlinearODEModel`](@ref) is one `EnsembleProblem`. A [`DiscreteDynamicsModel`](@ref) evaluates `f(t, x, Δt)` on each point. The returned `ODESolution` stores `[x; vec(Φ)]`, and ``\Phi P_{k-1|k-1} \Phi^\top`` is the cubature covariance before ``Q`` is added. `filter.P` includes ``Q``.
 
 ## Update
 
-Sigma points are redrawn from the prior ``\bigl(x_{k:k-1}, P_{k:k-1}\bigr)`` and passed through ``h(t, x)``:
+Sigma points are redrawn from the prior ``\bigl(x_{k|k-1}, P_{k|k-1}\bigr)`` and passed through ``h(t, x)``:
 
 ```math
-\hat y_{k:k-1} = \sum_i w_i\, h\bigl(t_k, \chi_{k:k-1}^{(i)}\bigr),
+\hat y_{k|k-1} = \sum_i w_i\, h\bigl(t_k, \chi_{k|k-1}^{(i)}\bigr),
 ```
 
 ```math
-S_{y,k:k-1} = \sum_i w_i
-\big(h\bigl(t_k, \chi_{k:k-1}^{(i)}\bigr) - \hat y_{k:k-1}\big)
-\big(h\bigl(t_k, \chi_{k:k-1}^{(i)}\bigr) - \hat y_{k:k-1}\big)^\top + R,
+S_{y,k|k-1} = \sum_i w_i
+\big(h\bigl(t_k, \chi_{k|k-1}^{(i)}\bigr) - \hat y_{k|k-1}\big)
+\big(h\bigl(t_k, \chi_{k|k-1}^{(i)}\bigr) - \hat y_{k|k-1}\big)^\top + R,
 ```
 
 ```math
-P_{xy,k:k-1} = \sum_i w_i
-\big(\chi_{k:k-1}^{(i)} - x_{k:k-1}\big)
-\big(h\bigl(t_k, \chi_{k:k-1}^{(i)}\bigr) - \hat y_{k:k-1}\big)^\top,
+P_{xy,k|k-1} = \sum_i w_i
+\big(\chi_{k|k-1}^{(i)} - x_{k|k-1}\big)
+\big(h\bigl(t_k, \chi_{k|k-1}^{(i)}\bigr) - \hat y_{k|k-1}\big)^\top,
 ```
 
 ```math
-K = P_{xy,k:k-1} S_{y,k:k-1}^{-1}, \qquad
-x_{k:k} = x_{k:k-1} + K\bigl(y_{k} - \hat y_{k:k-1}\bigr),
+K = P_{xy,k|k-1} S_{y,k|k-1}^{-1}, \qquad
+x_{k|k} = x_{k|k-1} + K\bigl(y_{k} - \hat y_{k|k-1}\bigr),
 ```
 
 ```math
-P_{k:k}
-  = P_{k:k-1}
-  - P_{xy,k:k-1} K^\top
-  - K P_{xy,k:k-1}^\top
-  + K S_{y,k:k-1} K^\top.
+P_{k|k}
+  = P_{k|k-1}
+  - P_{xy,k|k-1} K^\top
+  - K P_{xy,k|k-1}^\top
+  + K S_{y,k|k-1} K^\top.
 ```
 
-``S_{y,k:k-1}`` and ``P_{k:k}`` are symmetrized. Process and measurement noise are added after the cubature. The posterior is the Joseph formula of Zanetti and DeMars rather than ``P_{k:k-1} - K S_{y,k:k-1} K^\top``. As on the [UKF](@ref ukf-tutorial) page, that form stays symmetric and is less sensitive to roundoff in ``K``. It remains valid when the gain is not the optimal ``P_{xy} S_y^{-1}``. For the optimal gain the two formulas agree in exact arithmetic. No measurement Jacobian is required: ``P_{xy}`` takes the place of ``P H^\top``. The cubature only supplies the moments.
+``S_{y,k|k-1}`` and ``P_{k|k}`` are symmetrized. Process and measurement noise are added after the cubature. The posterior covariance ``P_{k|k}`` is the Joseph formula of Zanetti and DeMars rather than ``P_{k|k-1} - K S_{y,k|k-1} K^\top``. As on the [UKF](@ref ukf-tutorial) page, that form stays symmetric and is less sensitive to roundoff in ``K``. It remains valid when the gain is not the optimal ``P_{xy,k|k-1} S_{y,k|k-1}^{-1}``. For the optimal gain the two formulas agree in exact arithmetic. No measurement Jacobian is required: ``P_{xy,k|k-1}`` takes the place of ``P_{k|k-1} H^\top``. The cubature only supplies the moments.
 
 ## Two-body demo
 
-`demo/demo_cut.jl` uses the same 7000 km orbit, initial mean and covariance, range and range-rate measurements, and noise as the EKF demo. Process noise is an [`UnbiasedRandomProcess`](@ref) with scale `1e-6`. The filter order is 4. The figure is the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``, written to `demo/output/twobody_cut_errors.png`.
+`demo/twobody/demo_cut.jl` uses the same 7000 km orbit, initial mean and covariance, range and range-rate measurements, and noise as the EKF demo. Process noise is an [`UnbiasedRandomProcess`](@ref) with scale `1e-6`. The filter order is 4. The figure samples the returned `ODESolution` and draws the estimation error (estimate minus truth) with bands ``\pm 3\sqrt{P_{ii}}``, written to `demo/twobody/plots/twobody_cut_errors.png`.
 
 ```julia
 using SequentialFilters
 
-order = 4
-filt = ConjugateUnscentedKalmanFilter(0.0, x_hat0, P0; order = order)
-Qmodel = UnbiasedRandomProcess(1.0e-6)
+filt = ConjugateUnscentedKalmanFilter(0.0, x_hat0, P0; order = 4)
+dynamics = NonlinearODEModel(twobody!; n = n, p = μ)
+process_noise_model = UnbiasedRandomProcess(1.0e-6)
 for k in 1:n_meas
-    predict!(filt, propagate, get_noise(Qmodel, Δt), Δt)
+    predict!(filt, dynamics, process_noise_model, Δt)
     update!(filt, range_rangerate, ys[k], R)
 end
 ```
 
-`demo/demo_srcut.jl` prints elapsed time, process CPU time, and allocations for this filter and the square-root CUT. Both two-body runs propagate the same CUT4 points. The linear kernel is 5000 steps of a 6-state model with ``f(x) = Fx`` and no ODE.
+The default propagation is `ensemblealg = EnsembleSerial()`. Pass `EnsembleThreads()`, `EnsembleDistributed()`, or `EnsembleSplitThreads()` to run the CUT points in parallel.
+
+`demo/twobody/demo_srcut.jl` prints elapsed time, process CPU time, and allocations for this filter and the square-root CUT. Both two-body runs propagate the same CUT4 points. The linear kernel is 5000 steps of a 6-state model with ``f(x) = Fx`` and no ODE.
 
 ```bash
-julia --project=demo demo/demo_cut.jl
+julia --project=demo demo/twobody/demo_cut.jl
 ```
 
 ## Same calls on a linear model
@@ -106,7 +110,7 @@ H = [1.0 0.0]
 Q = [1.0e-3 0.0; 0.0 1.0e-3]
 R = [0.05;;]
 filt = ConjugateUnscentedKalmanFilter(0.0, [0.0, 1.0], Matrix{Float64}(I, 2, 2); order = 4)
-predict!(filt, (t, x, Δt) -> F * x, Q, 1.0)
+predict!(filt, DiscreteDynamicsModel((t, x, Δt) -> F * x; n = 2), AdditiveProcessNoise(Q), 1.0)
 update!(filt, (t, x) -> H * x, [0.2], R)
 filt.x
 ```
