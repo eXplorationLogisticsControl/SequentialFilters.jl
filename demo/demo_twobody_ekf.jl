@@ -133,7 +133,7 @@ for k in 1:n_meas
         record!(t, sol.u[i][1:n], propagated_covariance(sol.u[i], P_start, n))
     end
     record!(ekf.t, ekf.x, ekf.P)
-    update!(ekf, measurements, ys[k], R)
+    SequentialFilters.update!(ekf, measurements, ys[k], R)
     record!(ekf.t, ekf.x, ekf.P)
 end
 
