@@ -7,6 +7,7 @@ Sequential filters for nonlinear state estimation.
 | [`ExtendedKalmanFilter`](@ref) | covariance `P` | additive, through an ODE propagation |
 | [`UnscentedKalmanFilter`](@ref) | covariance `P` | additive |
 | [`ConjugateUnscentedKalmanFilter`](@ref) | covariance `P` | additive, CUT weights |
+| [`HigherOrderUnscentedEstimator`](@ref) | covariance `P`, marginal skewness and kurtosis | additive |
 | [`SquareRootExtendedKalmanFilter`](@ref) | lower factor `S` with `P = S*S'` | additive |
 | [`SquareRootUnscentedKalmanFilter`](@ref) | lower factor `S` with `P = S*S'` | additive |
 | [`SquareRootConjugateUnscentedKalmanFilter`](@ref) | lower factor `S` with `P = S*S'` | additive, CUT weights |
@@ -24,6 +25,7 @@ Each tutorial starts with why that filter exists and the papers to read, then th
 - [Extended Kalman filter (EKF)](@ref ekf-tutorial)
 - [Unscented Kalman filter (UKF)](@ref ukf-tutorial)
 - [Conjugate unscented filter (CUT)](@ref cut-tutorial)
+- [Higher-order unscented estimator (HOUSE)](@ref house-tutorial)
 - [Square-root EKF (SREKF)](@ref srekf-tutorial)
 - [Square-root UKF (SRUKF)](@ref srukf-tutorial)
 - [Square-root CUT (SRCUT)](@ref srcut-tutorial)
@@ -32,13 +34,14 @@ Each tutorial starts with why that filter exists and the papers to read, then th
 
 ## Demos and cost
 
-The demos share the two-body problem in `demo/twobody/demo_ekf.jl`: a 7000 km orbit, range and range-rate from a rotating ground station, and the same initial covariance and process-noise scale. Each script saves an error figure (estimate minus truth, with `±3√P[i,i]` bands sampled along the predicted `ODESolution`) and prints elapsed time, process CPU time, and allocations. Multi-point filters propagate with [`EnsemblePropagation`](@ref). The default `ensemblealg` is [`EnsembleSerial`](@ref).
+The demos share the two-body problem in `demo/twobody/demo_ekf.jl`: a 7000 km orbit, range and range-rate from a rotating ground station, and the same initial covariance and process-noise scale. Each script saves an error figure (estimate minus truth, with `±3√P[i,i]` bands sampled along the predicted `ODESolution`). The covariance and square-root pairs also print elapsed time, process CPU time, and allocations. The HOUSE demos print the final error. Multi-point filters propagate with [`EnsemblePropagation`](@ref). The default `ensemblealg` is [`EnsembleSerial`](@ref).
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.test()'
 julia --project=demo demo/twobody/demo_ekf.jl
 julia --project=demo demo/twobody/demo_ukf.jl
 julia --project=demo demo/twobody/demo_cut.jl
+julia --project=demo demo/twobody/demo_house.jl
 julia --project=demo demo/twobody/demo_srekf.jl
 julia --project=demo demo/twobody/demo_srukf.jl
 julia --project=demo demo/twobody/demo_srcut.jl
@@ -47,6 +50,7 @@ julia --project=demo demo/twobody/demo_particle.jl
 julia --project=demo demo/lorenz/demo_ekf.jl
 julia --project=demo demo/lorenz/demo_ukf.jl
 julia --project=demo demo/lorenz/demo_cut.jl
+julia --project=demo demo/lorenz/demo_house.jl
 julia --project=demo demo/lorenz/demo_srekf.jl
 julia --project=demo demo/lorenz/demo_srukf.jl
 julia --project=demo demo/lorenz/demo_srcut.jl

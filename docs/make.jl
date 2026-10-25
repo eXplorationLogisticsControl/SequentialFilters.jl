@@ -27,6 +27,7 @@ makedocs(;
             "Extended Kalman filter (EKF)" => "filters/ekf.md",
             "Unscented Kalman filter (UKF)" => "filters/ukf.md",
             "Conjugate unscented filter (CUT)" => "filters/cut.md",
+            "Higher-order unscented estimator (HOUSE)" => "filters/house.md",
             "Square-root EKF (SREKF)" => "filters/srekf.md",
             "Square-root UKF (SRUKF)" => "filters/srukf.md",
             "Square-root CUT (SRCUT)" => "filters/srcut.md",

@@ -42,6 +42,13 @@ cut_points
 SquareRootConjugateUnscentedKalmanFilter
 ```
 
+## Higher-order unscented estimator
+
+```@docs
+HigherOrderUnscentedEstimator
+house_sigma_points
+```
+
 ## Square-root filters
 
 ```@docs
