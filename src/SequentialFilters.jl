@@ -16,7 +16,7 @@ include("srekf.jl")
 include("srukf.jl")
 include("srcut.jl")
 include("srckf.jl")
-include("particle.jl")
+include("pf.jl")
 include("diagnosis.jl")
 
 export ProcessNoiseModel, UnbiasedRandomProcess, AdditiveProcessNoise, get_noise
