@@ -157,7 +157,7 @@ println("velocity error (km/s): ", norm(filt.x[4:6] .- x_true[4:6]))
 
 `predict!` integrates the two-body dynamics and the state-transition matrix, then adds the discrete process noise from `UnbiasedRandomProcess`. `update!` applies the range and range-rate Jacobian and the Joseph covariance update. Both mutate `filt`.
 
-Derivative-free filters take `range_rangerate` instead of the Jacobian model. The same loop with an unscented filter is `filt = UnscentedKalmanFilter(0.0, x_hat0, P0)` and `update!(filt, range_rangerate, ys[k], R)`. The scripts under `demo/twobody/` run every filter in the table on this orbit, and the [two-body tutorial](https://explorationlogisticscontrol.github.io/SequentialFilters.jl/dev/tutorials/basic/) walks through the same scenario.
+Derivative-free filters take `range_rangerate` instead of the Jacobian model. The same loop with an unscented filter is `filt = UnscentedKalmanFilter(0.0, x_hat0, P0)` and `update!(filt, range_rangerate, ys[k], R)`. The scripts under `demo/twobody/` run every filter in the table on this orbit, and the [basic sequential filter simulation](https://explorationlogisticscontrol.github.io/SequentialFilters.jl/dev/tutorials/basic/) walks through the same scenario.
 
 ```bash
 julia --project=demo demo/twobody/demo_ekf.jl
