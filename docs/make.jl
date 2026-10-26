@@ -38,9 +38,3 @@ makedocs(;
     ],
     warnonly = [:missing_docs],
 )
-
-deploydocs(;
-    repo = "github.com/eXplorationLogisticsControl/SequentialFilters.jl.git",
-    devbranch = "main",
-    push_preview = true,
-)
