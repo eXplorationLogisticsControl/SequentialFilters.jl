@@ -58,87 +58,107 @@ cd /path/to/your/project
 julia --project=.
 ```
 
-```julia
+```julia-repl
 pkg> add path/to/SequentialFilters.jl
 ```
 
-`path/to/SequentialFilters.jl` is the directory created by `git clone`. The quick start also loads `OrdinaryDiffEq` to integrate the Lorenz equation, so add that package to the same project:
+`path/to/SequentialFilters.jl` is the directory created by `git clone`. The quick start integrates the orbit with `OrdinaryDiffEq` and builds the measurement Jacobian with `ForwardDiff`, so add those packages to the same project:
 
-```julia
-pkg> add OrdinaryDiffEq
+```julia-repl
+pkg> add OrdinaryDiffEq ForwardDiff
 ```
 
 ## Quick start
 
-The Lorenz-63 system is estimated from noisy measurements of `(x, z)`. The vector field, the additive process noise, and the measurement Jacobian are the same ones in [`demo/lorenz/demo_ekf.jl`](demo/lorenz/demo_ekf.jl). This snippet runs 200 steps. The demo runs 2000 steps (`Δt = 0.02`, final time 40) and writes the error figure.
+A circular 7000 km orbit is estimated from range and range-rate measured by a rotating ground station. The dynamics, the initial error, and the noise are the ones in [`demo/twobody/demo_ekf.jl`](demo/twobody/demo_ekf.jl). The figure above is the square-root unscented filter on this same scenario. The snippet takes ten measurements per orbit for two orbits.
 
 ```julia
+using ForwardDiff
 using LinearAlgebra
 using OrdinaryDiffEq
 using Random
 using SequentialFilters
 
-function lorenz63!(du, u, p, t)
-    σ, ρ, β = p
-    x, y, z = u
-    du[1] = σ * (y - x)
-    du[2] = x * (ρ - z) - y
-    du[3] = x * y - β * z
+μ = 3.986004418e5          # km³/s²
+R_E = 6378.137             # km
+ω_E = 7.292115146706979e-5 # rad/s
+a = 7000.0                 # km
+inc = deg2rad(51.6)
+lat = deg2rad(28.5)
+lon0 = 0.0
+
+function twobody!(du, u, p, t)
+    du[1:3] = u[4:6]
+    du[4:6] = -μ * u[1:3] / norm(u[1:3])^3
     return nothing
 end
 
-p = (10.0, 28.0, 8.0 / 3.0)   # σ, ρ, β
-Δt = 0.02
-n_steps = 200
-x0 = [1.0, 1.0, 1.0]          # off the attractor
+period = 2π * sqrt(a^3 / μ)
+Δt = period / 10
+n_meas = 20
 
+function station_state(t)
+    cφ, sφ = cos(lat), sin(lat)
+    λ = lon0 + ω_E * t
+    cλ, sλ = cos(λ), sin(λ)
+    rs = R_E .* (cφ * cλ, cφ * sλ, sφ)
+    vs = (ω_E * R_E) .* (-cφ * sλ, cφ * cλ, 0.0)
+    return rs, vs
+end
+
+function range_rangerate(t, x)
+    rs, vs = station_state(t)
+    ρx, ρy, ρz = x[1] - rs[1], x[2] - rs[2], x[3] - rs[3]
+    ρ = sqrt(ρx * ρx + ρy * ρy + ρz * ρz)
+    ρdot = (ρx * (x[4] - vs[1]) + ρy * (x[5] - vs[2]) + ρz * (x[6] - vs[3])) / ρ
+    return [ρ, ρdot]
+end
+
+function get_h_H(t, x)
+    yhat = range_rangerate(t, x)
+    jac = ForwardDiff.jacobian(z -> range_rangerate(t, z), x)
+    return yhat, jac
+end
+
+speed = sqrt(μ / a)
+x0 = [a, 0.0, 0.0, 0.0, speed * cos(inc), speed * sin(inc)]
 truth = solve(
-    ODEProblem(lorenz63!, x0, (0.0, n_steps * Δt), p),
+    ODEProblem(twobody!, x0, (0.0, n_meas * Δt), μ),
     Tsit5();
-    reltol = 1e-10,
-    abstol = 1e-10,
-    saveat = Δt,
+    reltol = 1e-12,
+    abstol = 1e-12,
 )
 
-σ_meas = 1.0
-R = Diagonal(fill(σ_meas^2, 2))
+σ_ρ = 0.01       # 10 m
+σ_ρdot = 1.0e-5  # 1 cm/s
+R = Diagonal([σ_ρ^2, σ_ρdot^2])
 Random.seed!(1)
-ys = map(1:n_steps) do k
-    state = truth(k * Δt)
-    return [state[1], state[3]] .+ σ_meas .* randn(2)
+ys = map(Δt .* (1:n_meas)) do t
+    y = range_rangerate(t, truth(t))
+    return y .+ [σ_ρ, σ_ρdot] .* randn(2)
 end
 
-dynamics = NonlinearODEModel(lorenz63!; n = 3, p = p, reltol = 1e-5, abstol = 1e-5)
-process_noise = AdditiveProcessNoise(Matrix(1.0e-3 * I(3)))
-
-h(t, x) = [x[1], x[3]]
-function get_h_H(t, x)
-    H = zeros(2, 3)
-    H[1, 1] = 1.0
-    H[2, 3] = 1.0
-    return h(t, x), H
-end
+x_hat0 = x0 .+ [1.0, -0.5, 0.8, 1.0e-3, -0.5e-3, 0.7e-3]
+P0 = Matrix(Diagonal([fill(1.0^2, 3); fill((1.0e-3)^2, 3)]))
+dynamics = NonlinearODEModel(twobody!; n = 6, p = μ)
+process_noise = UnbiasedRandomProcess(1.0e-6)
 measurements = NonlinearMeasurementModel(get_h_H)
 
-x_hat0 = x0 .+ [5.0, -5.0, 8.0]
-P0 = Matrix(Diagonal(fill(25.0, 3)))
 filt = ExtendedKalmanFilter(0.0, x_hat0, P0)
-
-for k in 1:n_steps
+for k in 1:n_meas
     predict!(filt, dynamics, process_noise, Δt)
     update!(filt, measurements, ys[k], R)
 end
 
-println("estimate: ", filt.x)
-println("truth:    ", truth(filt.t))
-println("error:    ", filt.x .- truth(filt.t))
+x_true = truth(filt.t)
+println("position error (km): ", norm(filt.x[1:3] .- x_true[1:3]))
+println("velocity error (km/s): ", norm(filt.x[4:6] .- x_true[4:6]))
 ```
 
-`predict!` integrates the continuous dynamics and the state-transition matrix, then adds `Q`. `update!` applies the measurement Jacobian and the Joseph covariance update. Both mutate `filt`.
+`predict!` integrates the two-body dynamics and the state-transition matrix, then adds the discrete process noise from `UnbiasedRandomProcess`. `update!` applies the range and range-rate Jacobian and the Joseph covariance update. Both mutate `filt`.
 
-Derivative-free filters take the measurement function instead of the Jacobian model. The same loop with an unscented filter is `filt = UnscentedKalmanFilter(0.0, x_hat0, P0)` and `update!(filt, h, ys[k], R)`. The Lorenz and two-body scripts under `demo/` cover every filter in the table, and the [two-body tutorial](https://explorationlogisticscontrol.github.io/SequentialFilters.jl/dev/tutorials/basic/) walks through a range and range-rate example.
+Derivative-free filters take `range_rangerate` instead of the Jacobian model. The same loop with an unscented filter is `filt = UnscentedKalmanFilter(0.0, x_hat0, P0)` and `update!(filt, range_rangerate, ys[k], R)`. The scripts under `demo/twobody/` run every filter in the table on this orbit, and the [two-body tutorial](https://explorationlogisticscontrol.github.io/SequentialFilters.jl/dev/tutorials/basic/) walks through the same scenario.
 
 ```bash
-julia --project=demo demo/lorenz/demo_ekf.jl
 julia --project=demo demo/twobody/demo_ekf.jl
 ```
