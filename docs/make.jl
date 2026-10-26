@@ -21,7 +21,7 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Tutorials" => [
-            "Two-body orbit" => "tutorials/basic.md",
+            "Basic sequential filter simulation" => "tutorials/basic.md",
         ],
         "Filters" => [
             "Extended Kalman filter (EKF)" => "filters/ekf.md",
