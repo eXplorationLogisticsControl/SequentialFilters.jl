@@ -1,4 +1,4 @@
-# [Two-body orbit](@id twobody-tutorial)
+# [Basic sequential filter simulation](@id twobody-tutorial)
 
 `demo/twobody/demo_ekf.jl` estimates a circular orbit from range and range-rate. It includes `demo/twobody/twobody_scenario.jl`, which builds the orbit, the ground station, the measurements, and the names passed to [`predict!`](@ref) and [`update!`](@ref). The script then runs an [`ExtendedKalmanFilter`](@ref) and writes the error figure below. The [extended Kalman filter](@ref ekf-tutorial) page has the predict step and the Joseph update. This page is the example those equations run on.
 
@@ -7,8 +7,6 @@ Position is in kilometers and velocity in kilometers per second. Time is in seco
 ```bash
 julia --project=demo demo/twobody/demo_ekf.jl
 ```
-
-## What the script loads
 
 The demo activates the `demo/` project, loads CairoMakie for the figure, and includes the shared scenario. `predict!` and `update!` are the SequentialFilters methods.
 
@@ -28,7 +26,9 @@ include(joinpath(@__DIR__, "twobody_scenario.jl"))
 
 Everything from the next section through `load_twobody_case` is defined by that include. The same names are what the UKF, CUT, square-root, and particle demos use.
 
-## Constants
+## Dynamics
+
+We first define the constants:
 
 ```julia
 const μ = 3.986004418e5
@@ -42,13 +42,17 @@ const lon0 = 0.0
 
 `μ` is Earth's gravitational parameter, in km³/s². `R_E` is the equatorial radius, in km, and `ω_E` is Earth's rotation rate, in rad/s. The spacecraft flies a circular orbit of radius `a` = 7000 km at inclination `inc` = 51.6°. The ground station sits at latitude `lat` = 28.5° and, at `t = 0`, at longitude `lon0` = 0.
 
-## Dynamics
-
-`twobody!` is the in-place two-body vector field. The state is `[x, y, z, vx, vy, vz]`. Position rate is velocity, and acceleration is the inverse-square gravity of a point mass `μ`:
+For the dynamics, `twobody!` is the in-place two-body vector field, compatible with [`OrdinaryDiffEq.jl`](https://github.com/SciML/OrdinaryDiffEq.jl).
+The state is `[x, y, z, vx, vy, vz]`. Position rate is velocity, and acceleration is the inverse-square gravity of a point mass `μ`:
 
 ```math
-\dot{\mathbf{r}} = \mathbf{v}, \qquad
-\dot{\mathbf{v}} = -\mu\, \mathbf{r} / \|\mathbf{r}\|^3.
+\dot{\boldsymbol{x}} = \begin{bmatrix}
+    \dot{\boldsymbol{r}}  \\ \dot{\boldsymbol{v}} 
+\end{bmatrix}
+=
+\begin{bmatrix}
+    \dot{\boldsymbol{v}}  \\ -\dfrac{\mu}{\|\boldsymbol{r}\|^3} \boldsymbol{r}
+\end{bmatrix}
 ```
 
 ```julia
@@ -61,19 +65,24 @@ end
 
 The function reads the global `μ`. The ODE parameter `p` is still set to `μ` on the truth problem and on the filter's dynamics model, which keeps the call in the usual `(du, u, p, t)` form.
 
-## Measurement schedule
+## Measurement 
+
+### Measurement schedule
+
+We consider measurements coming in according to: 
 
 ```julia
-const period = 2π * sqrt(a^3 / μ)
-const Δt = period / 10
-const n_orbits = 2
-const n_meas = 10 * n_orbits
-const n_save = 9
+const period = 2π * sqrt(a^3 / μ)  # Keplerian period of the circular orbit
+const Δt = period / 10              # ten predict steps per revolution
+const n_orbits = 2                  # number of revolutions
+const n_meas = 10 * n_orbits        # one measurement at the end of each step
+const n_save = 9                    # saveat samples on a predict, including endpoints
 ```
 
 `period` is the Keplerian period of the circular orbit. `Δt` is one tenth of that period, so the filter takes ten predict steps per revolution. `n_orbits` is 2, and `n_meas` is 20, one measurement at the end of each step. `n_save` is the number of `saveat` samples on a predict interval, counting the two endpoints. The plot loop skips those endpoints and records the seven interior samples on its own.
 
-## Ground station
+
+### Ground station
 
 `station_state(t)` returns the station position and velocity in the same inertial frame as the spacecraft. Longitude advances as `lon0 + ω_E * t`. The position is the spherical site on a sphere of radius `R_E`. The velocity is the rigid rotation of that site about Earth's axis.
 
@@ -92,9 +101,25 @@ end
 
 `rs` is `(x, y, z)` in km. `vs` is in km/s, with no vertical component.
 
-## Range and range rate
+### Range and range rate
 
 `range_rangerate(t, x)` is the measurement function `h`. `ρ` is the range from the station to the spacecraft. `ρdot` is the range rate, the line-of-sight component of the relative velocity.
+
+```math
+\boldsymbol{h}(t, \boldsymbol{x})
+=
+\begin{bmatrix}
+\rho \\ \dot{\rho}
+\end{bmatrix},
+\qquad
+\boldsymbol{\rho} = \boldsymbol{r} - \boldsymbol{r}_s(t),
+\qquad
+\rho = \|\boldsymbol{\rho}\|,
+\qquad
+\dot{\rho}
+=
+\frac{\boldsymbol{\rho}^\top \bigl(\boldsymbol{v} - \boldsymbol{v}_s(t)\bigr)}{\rho}.
+```
 
 ```julia
 function range_rangerate(t, x)
@@ -109,6 +134,21 @@ end
 ```
 
 `get_h_H(t, x)` is what the extended Kalman filter evaluates at the prior mean ``x_{k|k-1}``. The first return is the predicted measurement ``\hat y_{k|k-1}``. The second is the Jacobian `H = ∂h/∂x`, from ForwardDiff, a 2×6 matrix.
+
+```math
+\boldsymbol{H}
+=
+\frac{\partial \boldsymbol{h}}{\partial \boldsymbol{x}}
+=
+\begin{bmatrix}
+\boldsymbol{u}^\top & \boldsymbol{0}^\top \\
+\dfrac{1}{\rho}\bigl(\boldsymbol{v}_{\mathrm{rel}}^\top - \dot{\rho}\, \boldsymbol{u}^\top\bigr) & \boldsymbol{u}^\top
+\end{bmatrix},
+\qquad
+\boldsymbol{u} = \boldsymbol{\rho}/\rho,
+\qquad
+\boldsymbol{v}_{\mathrm{rel}} = \boldsymbol{v} - \boldsymbol{v}_s(t).
+```
 
 ```julia
 function get_h_H(t, x)
