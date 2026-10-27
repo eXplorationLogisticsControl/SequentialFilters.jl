@@ -1,7 +1,7 @@
 """
 Demo with two-body dynamics using the extended Kalman filter.
 
-Dynamics, measurements, and noise live in `twobody_scenario.jl`.
+Dynamics, measurements, and noise live in `twobody.jl`.
 The script saves the error figure and then prints elapsed time, process CPU
 time, and allocations for the EKF and the square-root EKF on this scenario.
 """
@@ -16,7 +16,7 @@ using SequentialFilters
 
 import SequentialFilters: predict!, update!
 
-include(joinpath(@__DIR__, "twobody_scenario.jl"))
+include(joinpath(@__DIR__, "twobody.jl"))
 
 ekf = ExtendedKalmanFilter(0.0, x_hat0, P0)
 

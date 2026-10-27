@@ -1,7 +1,7 @@
 """
 Demo with two-body dynamics using the higher-order unscented estimator.
 
-Dynamics, measurements, and noise live in `twobody_scenario.jl`.
+Dynamics, measurements, and noise live in `twobody.jl`.
 The script saves the error figure and prints the final position and
 velocity error.
 
@@ -18,7 +18,7 @@ using SequentialFilters
 
 import SequentialFilters: predict!, update!
 
-include(joinpath(@__DIR__, "twobody_scenario.jl"))
+include(joinpath(@__DIR__, "twobody.jl"))
 
 filt = HigherOrderUnscentedEstimator(0.0, x_hat0, P0)
 

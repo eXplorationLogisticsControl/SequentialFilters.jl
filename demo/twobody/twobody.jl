@@ -96,31 +96,6 @@ const h = range_rangerate
 H(t, x) = get_h_H(t, x)[2]
 const measurements = NonlinearMeasurementModel(get_h_H)
 
-const _dynamics_cache = Ref{NamedTuple}((; valid = false))
-
-function step_dynamics(t, x, Δt_step)
-    x64 = collect(Float64, x)
-    t64 = Float64(t)
-    dt64 = Float64(Δt_step)
-    hit = _dynamics_cache[]
-    if hit.valid && hit.t == t64 && hit.Δt == dt64 && hit.x == x64
-        # One predict calls both `f` and `F`. Consume the slot so a later
-        # run with the same state integrates again.
-        _dynamics_cache[] = (; valid = false)
-        return copy(hit.xnext), copy(hit.Φ)
-    end
-    xwork = copy(x64)
-    Pwork = Matrix{Float64}(I, n, n)
-    _, sol = propagate!(dynamics, process_noise_model, t64, dt64, xwork, Pwork)
-    Φ = reshape(copy(sol.u[end][(n + 1):end]), n, n)
-    xnext = copy(xwork)
-    _dynamics_cache[] = (; valid = true, t = t64, Δt = dt64, x = x64, xnext = xnext, Φ = Φ)
-    return copy(xnext), copy(Φ)
-end
-
-f(t, x, dt) = step_dynamics(t, x, dt)[1]
-F(t, x, dt) = step_dynamics(t, x, dt)[2]
-
 const labels = [
     "δx (km)",
     "δy (km)",
@@ -144,7 +119,7 @@ end
 """Return the two-body case built when this file was included."""
 function load_twobody_case()
     return (;
-        x0, x_hat0, P0, R, Q, Δt, n_meas, truth, ys, f, F, h, H, labels,
+        x0, x_hat0, P0, R, Q, Δt, n_meas, truth, ys, h, H, labels,
         dynamics, process_noise = process_noise_model, measurements,
     )
 end

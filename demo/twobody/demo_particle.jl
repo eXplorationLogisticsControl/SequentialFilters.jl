@@ -1,7 +1,7 @@
 """
 Demo with two-body dynamics using the bootstrap particle filter.
 
-Dynamics, measurements, and noise live in `twobody_scenario.jl`.
+Dynamics, measurements, and noise live in `twobody.jl`.
 The script saves the error figure and then prints elapsed time, process CPU
 time, and allocations for this scenario.
 """
@@ -17,7 +17,7 @@ using SequentialFilters
 
 import SequentialFilters: predict!, update!
 
-include(joinpath(@__DIR__, "twobody_scenario.jl"))
+include(joinpath(@__DIR__, "twobody.jl"))
 
 filt = ParticleFilter(0.0, x_hat0, P0; n_particles = 64, rng = MersenneTwister(1))
 
